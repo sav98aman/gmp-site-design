@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import AllotmentStatus from "./pages/AllotmentStatus";
 import IPODetail from "./pages/IPODetail";
 import Analytics from "./pages/Analytics";
+import Market from "./pages/Market";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/market" element={<Market />} />
             <Route path="/allotment" element={<AllotmentStatus />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/ipo/:ipoId" element={<IPODetail />} />

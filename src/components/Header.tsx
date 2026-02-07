@@ -8,6 +8,7 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const navLinks = [
   { path: "/", label: "Dashboard" },
+  { path: "/market", label: "Market" },
   { path: "/allotment", label: "Allotment Status" },
   { path: "/analytics", label: "Analytics" },
 ];
