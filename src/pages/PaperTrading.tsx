@@ -286,8 +286,8 @@ export default function PaperTrading() {
                 </div>
               </div>
 
-              {/* Price Chart - shown for ALL segments */}
-              <StockPriceChart stock={selectedStock} />
+              {/* Price Chart - only for EQ and CNC */}
+              {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
 
               {/* Futures Contracts */}
               {segment === 'FUT' && (
