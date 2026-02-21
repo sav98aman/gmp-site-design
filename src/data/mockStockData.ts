@@ -54,6 +54,7 @@ export interface Stock {
   name: string;
   sector: string;
   exchange: 'NSE' | 'BSE';
+  isFnO: boolean;
   livePrice: number;
   previousClose: number;
   dayHigh: number;
@@ -66,7 +67,7 @@ export interface Stock {
   fundamentals: FundamentalData;
   technicals: TechnicalIndicators;
   combinedVerdict: CombinedVerdict;
-  combinedScore: number; // 0-100
+  combinedScore: number;
   combinedSummary: string;
 }
 
@@ -106,6 +107,7 @@ export const mockStocks: Stock[] = [
     name: "Reliance Industries Ltd",
     sector: "Oil & Gas",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 2847.35,
     previousClose: 2812.50,
     dayHigh: 2865.00,
@@ -138,6 +140,7 @@ export const mockStocks: Stock[] = [
     name: "Tata Consultancy Services Ltd",
     sector: "IT Services",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 4125.80,
     previousClose: 4150.20,
     dayHigh: 4168.50,
@@ -170,6 +173,7 @@ export const mockStocks: Stock[] = [
     name: "HDFC Bank Ltd",
     sector: "Banking",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 1685.40,
     previousClose: 1662.80,
     dayHigh: 1698.50,
@@ -202,6 +206,7 @@ export const mockStocks: Stock[] = [
     name: "Infosys Ltd",
     sector: "IT Services",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 1862.50,
     previousClose: 1878.30,
     dayHigh: 1890.00,
@@ -234,6 +239,7 @@ export const mockStocks: Stock[] = [
     name: "Tata Motors Ltd",
     sector: "Automobiles",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 785.60,
     previousClose: 768.90,
     dayHigh: 798.50,
@@ -266,6 +272,7 @@ export const mockStocks: Stock[] = [
     name: "ICICI Bank Ltd",
     sector: "Banking",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 1268.90,
     previousClose: 1255.40,
     dayHigh: 1282.00,
@@ -298,6 +305,7 @@ export const mockStocks: Stock[] = [
     name: "Bharti Airtel Ltd",
     sector: "Telecom",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 1580.25,
     previousClose: 1598.80,
     dayHigh: 1610.00,
@@ -330,6 +338,7 @@ export const mockStocks: Stock[] = [
     name: "Wipro Ltd",
     sector: "IT Services",
     exchange: "NSE",
+    isFnO: false,
     livePrice: 298.45,
     previousClose: 302.10,
     dayHigh: 305.80,
@@ -362,6 +371,7 @@ export const mockStocks: Stock[] = [
     name: "Sun Pharmaceutical Industries Ltd",
     sector: "Pharmaceuticals",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 1792.30,
     previousClose: 1780.50,
     dayHigh: 1805.00,
@@ -394,6 +404,7 @@ export const mockStocks: Stock[] = [
     name: "Adani Enterprises Ltd",
     sector: "Conglomerate",
     exchange: "NSE",
+    isFnO: true,
     livePrice: 2425.60,
     previousClose: 2458.30,
     dayHigh: 2470.00,
@@ -445,6 +456,14 @@ export function getTopLosers(count = 5): Stock[] {
 
 export function getMostActive(count = 5): Stock[] {
   return [...mockStocks].sort((a, b) => b.volume - a.volume).slice(0, count);
+}
+
+export function getEquityStocks(): Stock[] {
+  return mockStocks;
+}
+
+export function getFnOStocks(): Stock[] {
+  return mockStocks.filter(s => s.isFnO);
 }
 
 export function formatMarketCap(value: number): string {

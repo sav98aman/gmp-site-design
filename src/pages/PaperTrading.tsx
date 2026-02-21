@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { WatchlistPanel } from "@/components/trading/WatchlistPanel";
 import { OrderPanel } from "@/components/trading/OrderPanel";
@@ -9,10 +9,9 @@ import { OptionsChain } from "@/components/trading/OptionsChain";
 import { FuturesPanel } from "@/components/trading/FuturesPanel";
 import { FundsBar } from "@/components/trading/FundsBar";
 import { StockPriceChart } from "@/components/market/StockPriceChart";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { mockStocks, getChangePercent, getChangeAmount, type Stock } from "@/data/mockStockData";
+import { mockStocks, getChangePercent, getChangeAmount, getEquityStocks, getFnOStocks, type Stock } from "@/data/mockStockData";
 import {
   type Order, type Position, type Holding, type FundsData, type Segment, type FutureContract,
   INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, getLotSize, formatINR,
@@ -31,13 +30,29 @@ const SEGMENT_LABELS: Record<MainTab, string> = {
 };
 
 export default function PaperTrading() {
-  const [selectedStock, setSelectedStock] = useState<Stock | null>(mockStocks[0]);
   const [segment, setSegment] = useState<MainTab>('EQ');
   const [orders, setOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [funds, setFunds] = useState<FundsData>(INITIAL_FUNDS);
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
+
+  // Segment-aware stock list and selection
+  const segmentStocks = useMemo(() => {
+    return (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
+  }, [segment]);
+
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(segmentStocks[0] ?? null);
+
+  // Auto-select first stock when segment changes
+  useEffect(() => {
+    const stocks = (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
+    const current = selectedStock;
+    // If current stock isn't in the new segment's list, select the first one
+    if (!current || !stocks.find(s => s.symbol === current.symbol)) {
+      setSelectedStock(stocks[0] ?? null);
+    }
+  }, [segment]);
 
   // Options state
   const [selectedStrike, setSelectedStrike] = useState<number | undefined>();
@@ -49,6 +64,13 @@ export default function PaperTrading() {
 
   const optionsChain = selectedStock ? generateOptionsChain(selectedStock.livePrice, selectedStock.symbol) : [];
   const futureContracts = selectedStock ? generateFutureContracts(selectedStock.symbol, selectedStock.livePrice) : [];
+
+  // Auto-select first future contract when stock changes in FUT mode
+  useEffect(() => {
+    if (segment === 'FUT' && futureContracts.length > 0 && !selectedFuture) {
+      setSelectedFuture(futureContracts[0]);
+    }
+  }, [selectedStock, segment, futureContracts.length]);
 
   // Recalculate unrealized P&L on positions
   useEffect(() => {
@@ -97,12 +119,10 @@ export default function PaperTrading() {
 
     setOrders(prev => [...prev, newOrder]);
 
-    // For MARKET orders — create/update position immediately
     if (orderData.orderType === 'MARKET') {
       const posId = `POS-${orderData.symbol}-${segment}-${orderData.strikePrice ?? ''}-${orderData.optionType ?? ''}-${orderData.expiry ?? ''}`;
 
       if (orderData.productType === 'CNC' && orderData.side === 'BUY') {
-        // Add to holdings
         setHoldings(prev => {
           const existing = prev.find(h => h.symbol === orderData.symbol);
           if (existing) {
@@ -124,7 +144,6 @@ export default function PaperTrading() {
           }];
         });
       } else {
-        // Add to intraday/F&O positions
         setPositions(prev => {
           const existing = prev.find(p => p.id === posId);
           if (existing) {
@@ -149,20 +168,11 @@ export default function PaperTrading() {
             } : p);
           }
           const newPosition: Position = {
-            id: posId,
-            symbol: orderData.symbol,
-            segment: orderData.segment,
-            side: orderData.side,
-            qty: orderData.qty,
-            avgPrice: executedPrice,
-            ltp,
-            pnl: 0,
-            pnlPercent: 0,
-            productType: orderData.productType,
-            expiry: orderData.expiry,
-            strikePrice: orderData.strikePrice,
-            optionType: orderData.optionType,
-            lotSize: orderData.lotSize,
+            id: posId, symbol: orderData.symbol, segment: orderData.segment,
+            side: orderData.side, qty: orderData.qty, avgPrice: executedPrice,
+            ltp, pnl: 0, pnlPercent: 0, productType: orderData.productType,
+            expiry: orderData.expiry, strikePrice: orderData.strikePrice,
+            optionType: orderData.optionType, lotSize: orderData.lotSize,
           };
           return [...prev, newPosition];
         });
@@ -213,8 +223,6 @@ export default function PaperTrading() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-
-      {/* Funds Bar */}
       <FundsBar funds={funds} onReset={handleReset} />
 
       {/* Segment Tabs */}
@@ -247,10 +255,10 @@ export default function PaperTrading() {
 
         {/* Left: Watchlist */}
         <div className="w-52 shrink-0 border-r border-border bg-card/30 overflow-hidden flex flex-col">
-          <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} />
+          <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
         </div>
 
-        {/* Center: Chart + F&O content */}
+        {/* Center: Chart + Contracts + Bottom Tabs */}
         <div className="flex-1 overflow-y-auto min-w-0">
           {selectedStock && (
             <div className="p-3 space-y-3">
@@ -259,6 +267,9 @@ export default function PaperTrading() {
                 <div>
                   <span className="font-bold text-lg">{selectedStock.symbol}</span>
                   <span className="text-xs text-muted-foreground ml-2">{selectedStock.name}</span>
+                  {(segment === 'FUT' || segment === 'OPT') && (
+                    <Badge variant="outline" className="ml-2 text-[10px]">F&O</Badge>
+                  )}
                 </div>
                 <div className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</div>
                 <div className={cn("flex items-center gap-1 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
@@ -275,10 +286,10 @@ export default function PaperTrading() {
                 </div>
               </div>
 
-              {/* Price Chart */}
+              {/* Price Chart - shown for ALL segments */}
               <StockPriceChart stock={selectedStock} />
 
-              {/* Futures / Options content below chart */}
+              {/* Futures Contracts */}
               {segment === 'FUT' && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -294,6 +305,7 @@ export default function PaperTrading() {
                 </div>
               )}
 
+              {/* Options Chain */}
               {segment === 'OPT' && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
