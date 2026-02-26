@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { WatchlistPanel } from "@/components/trading/WatchlistPanel";
 import { OrderPanel } from "@/components/trading/OrderPanel";
+import { OrderDrawer } from "@/components/trading/OrderDrawer";
+import { StockSearchDropdown } from "@/components/trading/StockSearchDropdown";
 import { PositionsTable } from "@/components/trading/PositionsTable";
 import { OrderBook } from "@/components/trading/OrderBook";
 import { HoldingsTable } from "@/components/trading/HoldingsTable";
@@ -12,17 +14,16 @@ import { StockPriceChart } from "@/components/market/StockPriceChart";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { mockStocks, getChangePercent, getChangeAmount, getEquityStocks, getFnOStocks, type Stock } from "@/data/mockStockData";
+import { getChangePercent, getChangeAmount, getEquityStocks, getFnOStocks, type Stock } from "@/data/mockStockData";
 import {
   type Order, type Position, type Holding, type FundsData, type Segment, type FutureContract,
-  INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, getLotSize, formatINR,
+  type OrderSide, INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, formatINR,
 } from "@/data/paperTradingData";
-import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers, List, BarChart3, ShoppingCart } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers } from "lucide-react";
 import { toast } from "sonner";
 
 type BottomTab = 'positions' | 'orders' | 'holdings';
 type MainTab = 'EQ' | 'FUT' | 'OPT' | 'CNC';
-type MobileView = 'watchlist' | 'chart' | 'order';
 
 const SEGMENT_LABELS: Record<MainTab, string> = {
   EQ: 'Equity Intraday',
@@ -39,16 +40,17 @@ export default function PaperTrading() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [funds, setFunds] = useState<FundsData>(INITIAL_FUNDS);
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
-  const [mobileView, setMobileView] = useState<MobileView>('watchlist');
 
-  // Segment-aware stock list and selection
+  // Order drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerSide, setDrawerSide] = useState<OrderSide>('BUY');
+
   const segmentStocks = useMemo(() => {
     return (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
   }, [segment]);
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(segmentStocks[0] ?? null);
 
-  // Auto-select first stock when segment changes
   useEffect(() => {
     const stocks = (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
     const current = selectedStock;
@@ -57,12 +59,8 @@ export default function PaperTrading() {
     }
   }, [segment]);
 
-  // Options state
   const [selectedStrike, setSelectedStrike] = useState<number | undefined>();
   const [selectedOptionType, setSelectedOptionType] = useState<'CE' | 'PE' | undefined>();
-  const [selectedOptionLTP, setSelectedOptionLTP] = useState<number | undefined>();
-
-  // Futures state
   const [selectedFuture, setSelectedFuture] = useState<FutureContract | undefined>();
 
   const optionsChain = selectedStock ? generateOptionsChain(selectedStock.livePrice, selectedStock.symbol) : [];
@@ -84,18 +82,19 @@ export default function PaperTrading() {
     setSelectedStrike(undefined);
     setSelectedOptionType(undefined);
     setSelectedFuture(undefined);
-    if (isMobile) setMobileView('chart');
   };
 
   const handleSelectOption = (strike: number, type: 'CE' | 'PE', ltp: number) => {
     setSelectedStrike(strike);
     setSelectedOptionType(type);
-    setSelectedOptionLTP(ltp);
   };
 
   const handleSelectFuture = (contract: FutureContract) => {
     setSelectedFuture(contract);
   };
+
+  const openBuy = () => { setDrawerSide('BUY'); setDrawerOpen(true); };
+  const openSell = () => { setDrawerSide('SELL'); setDrawerOpen(true); };
 
   const handlePlaceOrder = useCallback((orderData: Omit<Order, 'id' | 'timestamp' | 'status'>) => {
     if (!selectedStock) return;
@@ -112,9 +111,7 @@ export default function PaperTrading() {
 
     const orderId = `ORD${Date.now()}`;
     const newOrder: Order = {
-      ...orderData,
-      id: orderId,
-      timestamp: new Date(),
+      ...orderData, id: orderId, timestamp: new Date(),
       status: orderData.orderType === 'MARKET' ? 'EXECUTED' : 'OPEN',
       executedPrice: orderData.orderType === 'MARKET' ? executedPrice : undefined,
     };
@@ -131,10 +128,8 @@ export default function PaperTrading() {
             const newQty = existing.qty + orderData.qty;
             const newAvg = (existing.investedValue + totalValue) / newQty;
             return prev.map(h => h.symbol === orderData.symbol ? {
-              ...h, qty: newQty, avgPrice: newAvg,
-              investedValue: newQty * newAvg,
-              currentValue: newQty * ltp,
-              pnl: newQty * (ltp - newAvg),
+              ...h, qty: newQty, avgPrice: newAvg, investedValue: newQty * newAvg,
+              currentValue: newQty * ltp, pnl: newQty * (ltp - newAvg),
               pnlPercent: ((ltp - newAvg) / newAvg) * 100,
             } : h);
           }
@@ -149,14 +144,11 @@ export default function PaperTrading() {
         setPositions(prev => {
           const existing = prev.find(p => p.id === posId);
           if (existing) {
-            const netQty = orderData.side === 'BUY'
-              ? existing.qty + orderData.qty
-              : existing.qty - orderData.qty;
+            const netQty = orderData.side === 'BUY' ? existing.qty + orderData.qty : existing.qty - orderData.qty;
             if (netQty === 0) {
               const realizedPnL = (ltp - existing.avgPrice) * existing.qty * (existing.side === 'BUY' ? 1 : -1);
               setFunds(f => ({
-                ...f,
-                realizedPnL: f.realizedPnL + realizedPnL,
+                ...f, realizedPnL: f.realizedPnL + realizedPnL,
                 usedMargin: Math.max(0, f.usedMargin - marginRequired),
                 availableBalance: f.availableBalance + marginRequired + realizedPnL,
               }));
@@ -169,23 +161,20 @@ export default function PaperTrading() {
               pnlPercent: ((ltp - p.avgPrice) / p.avgPrice) * 100 * (p.side === 'BUY' ? 1 : -1),
             } : p);
           }
-          const newPosition: Position = {
+          return [...prev, {
             id: posId, symbol: orderData.symbol, segment: orderData.segment,
             side: orderData.side, qty: orderData.qty, avgPrice: executedPrice,
             ltp, pnl: 0, pnlPercent: 0, productType: orderData.productType,
             expiry: orderData.expiry, strikePrice: orderData.strikePrice,
             optionType: orderData.optionType, lotSize: orderData.lotSize,
-          };
-          return [...prev, newPosition];
+          }];
         });
       }
 
       setFunds(f => ({
-        ...f,
-        usedMargin: f.usedMargin + marginRequired,
+        ...f, usedMargin: f.usedMargin + marginRequired,
         availableBalance: f.availableBalance - marginRequired,
       }));
-
       toast.success(`${orderData.side} order executed — ${orderData.symbol} @ ${formatINR(executedPrice)}`);
     } else {
       toast.info(`${orderData.orderType} order placed for ${orderData.symbol}`);
@@ -196,11 +185,9 @@ export default function PaperTrading() {
     const ltp = selectedStock?.livePrice ?? position.ltp;
     const pnl = (ltp - position.avgPrice) * position.qty * (position.side === 'BUY' ? 1 : -1);
     const marginReleased = position.qty * position.avgPrice * (position.segment === 'EQ' ? 1 : 0.12);
-
     setPositions(prev => prev.filter(p => p.id !== position.id));
     setFunds(f => ({
-      ...f,
-      realizedPnL: f.realizedPnL + pnl,
+      ...f, realizedPnL: f.realizedPnL + pnl,
       usedMargin: Math.max(0, f.usedMargin - marginReleased),
       availableBalance: f.availableBalance + marginReleased + pnl,
     }));
@@ -213,14 +200,109 @@ export default function PaperTrading() {
   };
 
   const handleReset = () => {
-    setOrders([]);
-    setPositions([]);
-    setHoldings([]);
-    setFunds(INITIAL_FUNDS);
+    setOrders([]); setPositions([]); setHoldings([]); setFunds(INITIAL_FUNDS);
     toast.success("Paper trading reset! Starting fresh with ₹10,00,000");
   };
 
   const openOrdersCount = orders.filter(o => o.status === 'OPEN').length;
+
+  const orderDrawerProps = {
+    open: drawerOpen, onOpenChange: setDrawerOpen, stock: selectedStock,
+    availableBalance: funds.availableBalance, onPlaceOrder: handlePlaceOrder,
+    segment: segment as Segment, defaultSide: drawerSide,
+    selectedExpiry: segment === 'FUT' ? selectedFuture?.expiry : segment === 'OPT' ? 'Feb 27, 2025' : undefined,
+    selectedStrike: segment === 'OPT' ? selectedStrike : undefined,
+    selectedOptionType: segment === 'OPT' ? selectedOptionType : undefined,
+    futurePrice: segment === 'FUT' ? selectedFuture?.ltp : undefined,
+  };
+
+  // Shared components
+  const segmentTabs = (
+    <div className="flex items-center gap-0.5 overflow-x-auto py-1">
+      {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => (
+        <button key={seg} onClick={() => setSegment(seg)}
+          className={cn(
+            "flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
+            segment === seg ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          )}
+        >
+          {seg === 'EQ' && <Activity className="h-3 w-3" />}
+          {seg === 'FUT' && <LineChart className="h-3 w-3" />}
+          {seg === 'OPT' && <Layers className="h-3 w-3" />}
+          {seg === 'CNC' && <Package className="h-3 w-3" />}
+          {seg}
+          {!isMobile && <span className="text-[10px] opacity-70 hidden sm:inline">· {SEGMENT_LABELS[seg]}</span>}
+        </button>
+      ))}
+    </div>
+  );
+
+  const buyButtons = selectedStock && (
+    <div className="grid grid-cols-2 gap-2">
+      <button onClick={openBuy}
+        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
+      >
+        <TrendingUp className="h-4 w-4" /> BUY
+      </button>
+      <button onClick={openSell}
+        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
+      >
+        <TrendingDown className="h-4 w-4" /> SELL
+      </button>
+    </div>
+  );
+
+  const bottomTabs = (
+    <div className="border-t border-border">
+      <div className="flex items-center gap-1 px-3 pt-2 border-b border-border">
+        {([
+          { key: 'positions' as BottomTab, label: 'Positions', icon: LayoutGrid, count: positions.length },
+          { key: 'orders' as BottomTab, label: 'Orders', icon: BookOpen, count: openOrdersCount },
+          { key: 'holdings' as BottomTab, label: 'Holdings', icon: Package, count: holdings.length },
+        ]).map(tab => (
+          <button key={tab.key} onClick={() => setBottomTab(tab.key)}
+            className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-t transition-colors",
+              bottomTab === tab.key ? "bg-background border border-border border-b-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            <tab.icon className="h-3 w-3" />
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="bg-primary text-primary-foreground rounded-full text-[9px] w-3.5 h-3.5 flex items-center justify-center font-bold">{tab.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      <div className="p-3 overflow-x-auto">
+        {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
+        {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
+        {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
+      </div>
+    </div>
+  );
+
+  const stockTickerInfo = selectedStock && (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</span>
+        <span className={cn("flex items-center gap-0.5 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
+          {getChangePercent(selectedStock) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+          {getChangeAmount(selectedStock) >= 0 ? "+" : ""}{getChangeAmount(selectedStock).toFixed(2)}
+          ({getChangePercent(selectedStock) >= 0 ? "+" : ""}{getChangePercent(selectedStock).toFixed(2)}%)
+        </span>
+      </div>
+      <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
+        <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
+        <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
+        <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
+        {!isMobile && (
+          <>
+            <span>52W H: <span className="text-foreground font-mono">{selectedStock.weekHigh52}</span></span>
+            <span>52W L: <span className="text-foreground font-mono">{selectedStock.weekLow52}</span></span>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
   // --- MOBILE LAYOUT ---
   if (isMobile) {
@@ -229,160 +311,51 @@ export default function PaperTrading() {
         <Header />
         <FundsBar funds={funds} onReset={handleReset} />
 
-        {/* Segment Tabs */}
-        <div className="border-b border-border bg-card/30 px-2">
-          <div className="flex items-center gap-0.5 overflow-x-auto py-1">
-            {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => (
-              <button
-                key={seg}
-                onClick={() => setSegment(seg)}
-                className={cn(
-                  "flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
-                  segment === seg
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                {seg === 'EQ' && <Activity className="h-3 w-3" />}
-                {seg === 'FUT' && <LineChart className="h-3 w-3" />}
-                {seg === 'OPT' && <Layers className="h-3 w-3" />}
-                {seg === 'CNC' && <Package className="h-3 w-3" />}
-                {seg}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div className="border-b border-border bg-card/30 px-2">{segmentTabs}</div>
 
-        {/* Mobile View Tabs */}
-        <div className="border-b border-border bg-muted/30 px-2">
-          <div className="flex items-center gap-0.5 py-1">
-            {([
-              { key: 'watchlist' as MobileView, label: 'Stocks', icon: List },
-              { key: 'chart' as MobileView, label: 'Chart & Data', icon: BarChart3 },
-              { key: 'order' as MobileView, label: 'Order', icon: ShoppingCart },
-            ]).map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setMobileView(tab.key)}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-semibold transition-all",
-                  mobileView === tab.key
-                    ? "bg-background text-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <tab.icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Mobile Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Watchlist View */}
-          {mobileView === 'watchlist' && (
-            <div className="h-full">
-              <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
-            </div>
-          )}
+          <div className="p-3 space-y-3">
+            {/* Stock Search */}
+            <StockSearchDropdown selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
 
-          {/* Chart & Data View */}
-          {mobileView === 'chart' && selectedStock && (
-            <div className="p-3 space-y-3">
-              {/* Stock ticker */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-base">{selectedStock.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{selectedStock.name}</span>
-                  {(segment === 'FUT' || segment === 'OPT') && (
-                    <Badge variant="outline" className="text-[10px]">F&O</Badge>
+            {/* Price ticker */}
+            {stockTickerInfo}
+
+            {/* Chart or Contracts */}
+            {selectedStock && (segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+
+            {selectedStock && segment === 'FUT' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <LineChart className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-sm">Futures Contracts</span>
+                </div>
+                <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
+              </div>
+            )}
+
+            {selectedStock && segment === 'OPT' && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-sm">Options Chain</span>
+                  {selectedStrike && selectedOptionType && (
+                    <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</span>
-                  <span className={cn("flex items-center gap-0.5 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
-                    {getChangePercent(selectedStock) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                    {getChangeAmount(selectedStock) >= 0 ? "+" : ""}{getChangeAmount(selectedStock).toFixed(2)}
-                    ({getChangePercent(selectedStock) >= 0 ? "+" : ""}{getChangePercent(selectedStock).toFixed(2)}%)
-                  </span>
-                </div>
-                <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
-                  <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
-                  <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
-                  <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
-                </div>
+                <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
               </div>
+            )}
 
-              {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+            {/* Buy / Sell Buttons */}
+            {buyButtons}
 
-              {segment === 'FUT' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <LineChart className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">Futures Contracts</span>
-                  </div>
-                  <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
-                </div>
-              )}
-
-              {segment === 'OPT' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Layers className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">Options Chain</span>
-                    {selectedStrike && selectedOptionType && (
-                      <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
-                    )}
-                  </div>
-                  <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
-                </div>
-              )}
-
-              {/* Bottom tabs inline on mobile */}
-              <div className="border-t border-border pt-2">
-                <div className="flex items-center gap-1 mb-2">
-                  {([
-                    { key: 'positions', label: 'Positions', icon: LayoutGrid, count: positions.length },
-                    { key: 'orders', label: 'Orders', icon: BookOpen, count: openOrdersCount },
-                    { key: 'holdings', label: 'Holdings', icon: Package, count: holdings.length },
-                  ] as const).map(tab => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setBottomTab(tab.key)}
-                      className={cn("flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded transition-colors", bottomTab === tab.key ? "bg-primary/10 text-primary" : "text-muted-foreground")}
-                    >
-                      <tab.icon className="h-3 w-3" />
-                      {tab.label}
-                      {tab.count > 0 && (
-                        <span className="bg-primary text-primary-foreground rounded-full text-[9px] w-3.5 h-3.5 flex items-center justify-center font-bold">{tab.count}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <div className="overflow-x-auto">
-                  {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
-                  {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
-                  {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Order View */}
-          {mobileView === 'order' && (
-            <OrderPanel
-              stock={selectedStock}
-              availableBalance={funds.availableBalance}
-              onPlaceOrder={handlePlaceOrder}
-              segment={segment}
-              selectedExpiry={segment === 'FUT' ? selectedFuture?.expiry : segment === 'OPT' ? 'Feb 27, 2025' : undefined}
-              selectedStrike={segment === 'OPT' ? selectedStrike : undefined}
-              selectedOptionType={segment === 'OPT' ? selectedOptionType : undefined}
-              futurePrice={segment === 'FUT' ? selectedFuture?.ltp : undefined}
-            />
-          )}
+            {/* Positions / Orders / Holdings */}
+            {bottomTabs}
+          </div>
         </div>
+
+        <OrderDrawer {...orderDrawerProps} />
       </div>
     );
   }
@@ -393,67 +366,40 @@ export default function PaperTrading() {
       <Header />
       <FundsBar funds={funds} onReset={handleReset} />
 
-      {/* Segment Tabs */}
-      <div className="border-b border-border bg-card/30 px-4">
-        <div className="flex items-center gap-1 overflow-x-auto py-1">
-          {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => (
-            <button
-              key={seg}
-              onClick={() => setSegment(seg)}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
-                segment === seg
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
-            >
-              {seg === 'EQ' && <Activity className="h-3.5 w-3.5" />}
-              {seg === 'FUT' && <LineChart className="h-3.5 w-3.5" />}
-              {seg === 'OPT' && <Layers className="h-3.5 w-3.5" />}
-              {seg === 'CNC' && <Package className="h-3.5 w-3.5" />}
-              {seg}
-              <span className="text-[10px] opacity-70 hidden sm:inline">· {SEGMENT_LABELS[seg]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="border-b border-border bg-card/30 px-4">{segmentTabs}</div>
 
-      {/* Main Terminal Layout */}
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
         {/* Left: Watchlist */}
         <div className="w-52 shrink-0 border-r border-border bg-card/30 overflow-hidden flex flex-col">
           <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
         </div>
 
-        {/* Center: Chart + Contracts + Bottom Tabs */}
+        {/* Center */}
         <div className="flex-1 overflow-y-auto min-w-0">
           {selectedStock && (
             <div className="p-3 space-y-3">
-              {/* Stock ticker row */}
               <div className="flex items-center gap-3 flex-wrap">
                 <div>
                   <span className="font-bold text-lg">{selectedStock.symbol}</span>
                   <span className="text-xs text-muted-foreground ml-2">{selectedStock.name}</span>
-                  {(segment === 'FUT' || segment === 'OPT') && (
-                    <Badge variant="outline" className="ml-2 text-[10px]">F&O</Badge>
-                  )}
+                  {(segment === 'FUT' || segment === 'OPT') && <Badge variant="outline" className="ml-2 text-[10px]">F&O</Badge>}
                 </div>
-                <div className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</div>
-                <div className={cn("flex items-center gap-1 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
-                  {getChangePercent(selectedStock) >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  {getChangeAmount(selectedStock) >= 0 ? "+" : ""}{getChangeAmount(selectedStock).toFixed(2)}
-                  ({getChangePercent(selectedStock) >= 0 ? "+" : ""}{getChangePercent(selectedStock).toFixed(2)}%)
-                </div>
-                <div className="flex gap-3 text-xs text-muted-foreground ml-auto">
-                  <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
-                  <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
-                  <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
-                  <span>52W H: <span className="text-foreground font-mono">{selectedStock.weekHigh52}</span></span>
-                  <span>52W L: <span className="text-foreground font-mono">{selectedStock.weekLow52}</span></span>
-                </div>
+                {stockTickerInfo}
               </div>
 
-              {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+              {/* Chart with buy/sell overlay */}
+              <div className="relative">
+                {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+                {/* Floating buy/sell for desktop chart */}
+                <div className="absolute top-3 right-3 z-10 flex gap-2">
+                  <button onClick={openBuy}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-xs shadow-lg hover:opacity-90 transition-all"
+                  ><TrendingUp className="h-3.5 w-3.5" /> BUY</button>
+                  <button onClick={openSell}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-xs shadow-lg hover:opacity-90 transition-all"
+                  ><TrendingDown className="h-3.5 w-3.5" /> SELL</button>
+                </div>
+              </div>
 
               {segment === 'FUT' && (
                 <div>
@@ -461,6 +407,10 @@ export default function PaperTrading() {
                     <LineChart className="h-4 w-4 text-primary" />
                     <span className="font-semibold text-sm">Futures Contracts</span>
                     <span className="text-xs text-muted-foreground">— Select contract to trade</span>
+                    <div className="ml-auto flex gap-2">
+                      <button onClick={openBuy} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-[11px] hover:opacity-90"><TrendingUp className="h-3 w-3" /> BUY</button>
+                      <button onClick={openSell} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-[11px] hover:opacity-90"><TrendingDown className="h-3 w-3" /> SELL</button>
+                    </div>
                   </div>
                   <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
                 </div>
@@ -473,8 +423,12 @@ export default function PaperTrading() {
                     <span className="font-semibold text-sm">Options Chain</span>
                     <span className="text-xs text-muted-foreground">— Spot: {selectedStock.livePrice.toFixed(2)}</span>
                     {selectedStrike && selectedOptionType && (
-                      <Badge variant="outline" className="ml-auto text-xs">Selected: {selectedStrike} {selectedOptionType}</Badge>
+                      <Badge variant="outline" className="text-xs">{selectedStrike} {selectedOptionType}</Badge>
                     )}
+                    <div className="ml-auto flex gap-2">
+                      <button onClick={openBuy} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-[11px] hover:opacity-90"><TrendingUp className="h-3 w-3" /> BUY</button>
+                      <button onClick={openSell} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-[11px] hover:opacity-90"><TrendingDown className="h-3 w-3" /> SELL</button>
+                    </div>
                   </div>
                   <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
                 </div>
@@ -482,33 +436,7 @@ export default function PaperTrading() {
             </div>
           )}
 
-          {/* Bottom: Positions / Orders / Holdings */}
-          <div className="border-t border-border bg-card/20">
-            <div className="flex items-center gap-1 px-3 pt-2 border-b border-border">
-              {([
-                { key: 'positions', label: 'Positions', icon: LayoutGrid, count: positions.length },
-                { key: 'orders', label: 'Orders', icon: BookOpen, count: openOrdersCount },
-                { key: 'holdings', label: 'Holdings', icon: Package, count: holdings.length },
-              ] as const).map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setBottomTab(tab.key)}
-                  className={cn("flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t transition-colors", bottomTab === tab.key ? "bg-background border border-border border-b-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  <tab.icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                  {tab.count > 0 && (
-                    <span className="ml-0.5 bg-primary text-primary-foreground rounded-full text-[9px] w-4 h-4 flex items-center justify-center font-bold">{tab.count}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="p-3 overflow-x-auto">
-              {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
-              {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
-              {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
-            </div>
-          </div>
+          {bottomTabs}
         </div>
 
         {/* Right: Order Panel */}
@@ -522,10 +450,8 @@ export default function PaperTrading() {
           </div>
           <div className="flex-1 overflow-y-auto">
             <OrderPanel
-              stock={selectedStock}
-              availableBalance={funds.availableBalance}
-              onPlaceOrder={handlePlaceOrder}
-              segment={segment}
+              stock={selectedStock} availableBalance={funds.availableBalance}
+              onPlaceOrder={handlePlaceOrder} segment={segment}
               selectedExpiry={segment === 'FUT' ? selectedFuture?.expiry : segment === 'OPT' ? 'Feb 27, 2025' : undefined}
               selectedStrike={segment === 'OPT' ? selectedStrike : undefined}
               selectedOptionType={segment === 'OPT' ? selectedOptionType : undefined}
@@ -534,6 +460,8 @@ export default function PaperTrading() {
           </div>
         </div>
       </div>
+
+      <OrderDrawer {...orderDrawerProps} />
     </div>
   );
 }
