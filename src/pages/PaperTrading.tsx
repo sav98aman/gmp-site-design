@@ -11,16 +11,18 @@ import { FundsBar } from "@/components/trading/FundsBar";
 import { StockPriceChart } from "@/components/market/StockPriceChart";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { mockStocks, getChangePercent, getChangeAmount, getEquityStocks, getFnOStocks, type Stock } from "@/data/mockStockData";
 import {
   type Order, type Position, type Holding, type FundsData, type Segment, type FutureContract,
   INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, getLotSize, formatINR,
 } from "@/data/paperTradingData";
-import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers, List, BarChart3, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 type BottomTab = 'positions' | 'orders' | 'holdings';
 type MainTab = 'EQ' | 'FUT' | 'OPT' | 'CNC';
+type MobileView = 'watchlist' | 'chart' | 'order';
 
 const SEGMENT_LABELS: Record<MainTab, string> = {
   EQ: 'Equity Intraday',
@@ -30,12 +32,14 @@ const SEGMENT_LABELS: Record<MainTab, string> = {
 };
 
 export default function PaperTrading() {
+  const isMobile = useIsMobile();
   const [segment, setSegment] = useState<MainTab>('EQ');
   const [orders, setOrders] = useState<Order[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [funds, setFunds] = useState<FundsData>(INITIAL_FUNDS);
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
+  const [mobileView, setMobileView] = useState<MobileView>('watchlist');
 
   // Segment-aware stock list and selection
   const segmentStocks = useMemo(() => {
@@ -48,7 +52,6 @@ export default function PaperTrading() {
   useEffect(() => {
     const stocks = (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
     const current = selectedStock;
-    // If current stock isn't in the new segment's list, select the first one
     if (!current || !stocks.find(s => s.symbol === current.symbol)) {
       setSelectedStock(stocks[0] ?? null);
     }
@@ -65,14 +68,12 @@ export default function PaperTrading() {
   const optionsChain = selectedStock ? generateOptionsChain(selectedStock.livePrice, selectedStock.symbol) : [];
   const futureContracts = selectedStock ? generateFutureContracts(selectedStock.symbol, selectedStock.livePrice) : [];
 
-  // Auto-select first future contract when stock changes in FUT mode
   useEffect(() => {
     if (segment === 'FUT' && futureContracts.length > 0 && !selectedFuture) {
       setSelectedFuture(futureContracts[0]);
     }
   }, [selectedStock, segment, futureContracts.length]);
 
-  // Recalculate unrealized P&L on positions
   useEffect(() => {
     const unrealizedPnL = positions.reduce((sum, p) => sum + p.pnl, 0);
     setFunds(f => ({ ...f, unrealizedPnL }));
@@ -83,6 +84,7 @@ export default function PaperTrading() {
     setSelectedStrike(undefined);
     setSelectedOptionType(undefined);
     setSelectedFuture(undefined);
+    if (isMobile) setMobileView('chart');
   };
 
   const handleSelectOption = (strike: number, type: 'CE' | 'PE', ltp: number) => {
@@ -220,6 +222,172 @@ export default function PaperTrading() {
 
   const openOrdersCount = orders.filter(o => o.status === 'OPEN').length;
 
+  // --- MOBILE LAYOUT ---
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <FundsBar funds={funds} onReset={handleReset} />
+
+        {/* Segment Tabs */}
+        <div className="border-b border-border bg-card/30 px-2">
+          <div className="flex items-center gap-0.5 overflow-x-auto py-1">
+            {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => (
+              <button
+                key={seg}
+                onClick={() => setSegment(seg)}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
+                  segment === seg
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                {seg === 'EQ' && <Activity className="h-3 w-3" />}
+                {seg === 'FUT' && <LineChart className="h-3 w-3" />}
+                {seg === 'OPT' && <Layers className="h-3 w-3" />}
+                {seg === 'CNC' && <Package className="h-3 w-3" />}
+                {seg}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mobile View Tabs */}
+        <div className="border-b border-border bg-muted/30 px-2">
+          <div className="flex items-center gap-0.5 py-1">
+            {([
+              { key: 'watchlist' as MobileView, label: 'Stocks', icon: List },
+              { key: 'chart' as MobileView, label: 'Chart & Data', icon: BarChart3 },
+              { key: 'order' as MobileView, label: 'Order', icon: ShoppingCart },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setMobileView(tab.key)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-md text-xs font-semibold transition-all",
+                  mobileView === tab.key
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <tab.icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mobile Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Watchlist View */}
+          {mobileView === 'watchlist' && (
+            <div className="h-full">
+              <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
+            </div>
+          )}
+
+          {/* Chart & Data View */}
+          {mobileView === 'chart' && selectedStock && (
+            <div className="p-3 space-y-3">
+              {/* Stock ticker */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-base">{selectedStock.symbol}</span>
+                  <span className="text-xs text-muted-foreground">{selectedStock.name}</span>
+                  {(segment === 'FUT' || segment === 'OPT') && (
+                    <Badge variant="outline" className="text-[10px]">F&O</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</span>
+                  <span className={cn("flex items-center gap-0.5 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
+                    {getChangePercent(selectedStock) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                    {getChangeAmount(selectedStock) >= 0 ? "+" : ""}{getChangeAmount(selectedStock).toFixed(2)}
+                    ({getChangePercent(selectedStock) >= 0 ? "+" : ""}{getChangePercent(selectedStock).toFixed(2)}%)
+                  </span>
+                </div>
+                <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
+                  <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
+                  <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
+                  <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
+                </div>
+              </div>
+
+              {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+
+              {segment === 'FUT' && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <LineChart className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-sm">Futures Contracts</span>
+                  </div>
+                  <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
+                </div>
+              )}
+
+              {segment === 'OPT' && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Layers className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-sm">Options Chain</span>
+                    {selectedStrike && selectedOptionType && (
+                      <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
+                    )}
+                  </div>
+                  <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
+                </div>
+              )}
+
+              {/* Bottom tabs inline on mobile */}
+              <div className="border-t border-border pt-2">
+                <div className="flex items-center gap-1 mb-2">
+                  {([
+                    { key: 'positions', label: 'Positions', icon: LayoutGrid, count: positions.length },
+                    { key: 'orders', label: 'Orders', icon: BookOpen, count: openOrdersCount },
+                    { key: 'holdings', label: 'Holdings', icon: Package, count: holdings.length },
+                  ] as const).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setBottomTab(tab.key)}
+                      className={cn("flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded transition-colors", bottomTab === tab.key ? "bg-primary/10 text-primary" : "text-muted-foreground")}
+                    >
+                      <tab.icon className="h-3 w-3" />
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span className="bg-primary text-primary-foreground rounded-full text-[9px] w-3.5 h-3.5 flex items-center justify-center font-bold">{tab.count}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
+                  {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
+                  {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Order View */}
+          {mobileView === 'order' && (
+            <OrderPanel
+              stock={selectedStock}
+              availableBalance={funds.availableBalance}
+              onPlaceOrder={handlePlaceOrder}
+              segment={segment}
+              selectedExpiry={segment === 'FUT' ? selectedFuture?.expiry : segment === 'OPT' ? 'Feb 27, 2025' : undefined}
+              selectedStrike={segment === 'OPT' ? selectedStrike : undefined}
+              selectedOptionType={segment === 'OPT' ? selectedOptionType : undefined}
+              futurePrice={segment === 'FUT' ? selectedFuture?.ltp : undefined}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- DESKTOP LAYOUT ---
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -252,7 +420,6 @@ export default function PaperTrading() {
 
       {/* Main Terminal Layout */}
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
-
         {/* Left: Watchlist */}
         <div className="w-52 shrink-0 border-r border-border bg-card/30 overflow-hidden flex flex-col">
           <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
@@ -286,10 +453,8 @@ export default function PaperTrading() {
                 </div>
               </div>
 
-              {/* Price Chart - only for EQ and CNC */}
               {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
 
-              {/* Futures Contracts */}
               {segment === 'FUT' && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -297,15 +462,10 @@ export default function PaperTrading() {
                     <span className="font-semibold text-sm">Futures Contracts</span>
                     <span className="text-xs text-muted-foreground">— Select contract to trade</span>
                   </div>
-                  <FuturesPanel
-                    contracts={futureContracts}
-                    onSelectContract={handleSelectFuture}
-                    selectedExpiry={selectedFuture?.expiry}
-                  />
+                  <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
                 </div>
               )}
 
-              {/* Options Chain */}
               {segment === 'OPT' && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
@@ -313,18 +473,10 @@ export default function PaperTrading() {
                     <span className="font-semibold text-sm">Options Chain</span>
                     <span className="text-xs text-muted-foreground">— Spot: {selectedStock.livePrice.toFixed(2)}</span>
                     {selectedStrike && selectedOptionType && (
-                      <Badge variant="outline" className="ml-auto text-xs">
-                        Selected: {selectedStrike} {selectedOptionType}
-                      </Badge>
+                      <Badge variant="outline" className="ml-auto text-xs">Selected: {selectedStrike} {selectedOptionType}</Badge>
                     )}
                   </div>
-                  <OptionsChain
-                    data={optionsChain}
-                    spotPrice={selectedStock.livePrice}
-                    onSelectOption={handleSelectOption}
-                    selectedStrike={selectedStrike}
-                    selectedType={selectedOptionType}
-                  />
+                  <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
                 </div>
               )}
             </div>
@@ -346,9 +498,7 @@ export default function PaperTrading() {
                   <tab.icon className="h-3.5 w-3.5" />
                   {tab.label}
                   {tab.count > 0 && (
-                    <span className="ml-0.5 bg-primary text-primary-foreground rounded-full text-[9px] w-4 h-4 flex items-center justify-center font-bold">
-                      {tab.count}
-                    </span>
+                    <span className="ml-0.5 bg-primary text-primary-foreground rounded-full text-[9px] w-4 h-4 flex items-center justify-center font-bold">{tab.count}</span>
                   )}
                 </button>
               ))}
