@@ -7,6 +7,8 @@ import { ArrowLeft, Clock, Calendar, Share2, BookOpen } from "lucide-react";
 import { getBlogBySlug, getRelatedPosts, blogCategories } from "@/data/blogData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
