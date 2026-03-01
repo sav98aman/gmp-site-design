@@ -12,6 +12,7 @@ const navLinks = [
   { path: "/paper-trading", label: "Paper Trade" },
   { path: "/allotment", label: "Allotment Status" },
   { path: "/analytics", label: "Analytics" },
+  { path: "/blog", label: "Blog" },
 ];
 
 export function Header() {

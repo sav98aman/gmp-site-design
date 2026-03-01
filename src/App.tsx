@@ -10,6 +10,8 @@ import IPODetail from "./pages/IPODetail";
 import Analytics from "./pages/Analytics";
 import Market from "./pages/Market";
 import PaperTrading from "./pages/PaperTrading";
+import Blog from "./pages/Blog";
+import BlogPostPage from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/ipo/:ipoId" element={<IPODetail />} />
             <Route path="/paper-trading" element={<PaperTrading />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
