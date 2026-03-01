@@ -7,6 +7,8 @@ import { ArrowLeft, Clock, Calendar, Share2, BookOpen } from "lucide-react";
 import { getBlogBySlug, getRelatedPosts, blogCategories } from "@/data/blogData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -77,45 +79,14 @@ export default function BlogPost() {
           <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none 
             prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground
             prose-a:text-primary prose-li:text-muted-foreground
-            prose-table:text-sm prose-th:bg-muted prose-th:p-2 prose-th:text-left prose-th:font-semibold
-            prose-td:p-2 prose-td:border-t prose-td:border-border
+            prose-th:bg-muted prose-th:p-3 prose-th:text-left prose-th:font-semibold prose-th:text-foreground
+            prose-td:p-3 prose-td:border-t prose-td:border-border prose-td:text-muted-foreground
             prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
             prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground
             [&_table]:w-full [&_table]:border [&_table]:border-border [&_table]:rounded-lg [&_table]:overflow-hidden
+            [&_thead]:bg-muted/50
           ">
-            {post.content.split('\n').map((line, i) => {
-              if (line.startsWith('## ')) return <h2 key={i}>{line.slice(3)}</h2>;
-              if (line.startsWith('### ')) return <h3 key={i}>{line.slice(4)}</h3>;
-              if (line.startsWith('| ')) {
-                // Find consecutive table lines
-                const lines = post.content.split('\n');
-                const tableStart = lines.indexOf(line);
-                if (tableStart > 0 && lines[tableStart - 1]?.startsWith('| ')) return null; // skip non-first rows
-                const tableLines: string[] = [];
-                for (let j = tableStart; j < lines.length && lines[j].startsWith('| '); j++) {
-                  if (!lines[j].match(/^\|\s*[-:]+/)) tableLines.push(lines[j]);
-                }
-                if (tableLines.length < 2) return <p key={i}>{line}</p>;
-                const headers = tableLines[0].split('|').filter(Boolean).map(h => h.trim());
-                const rows = tableLines.slice(1).map(r => r.split('|').filter(Boolean).map(c => c.trim()));
-                return (
-                  <table key={i}>
-                    <thead>
-                      <tr>{headers.map((h, hi) => <th key={hi}>{h}</th>)}</tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, ri) => (
-                        <tr key={ri}>{row.map((cell, ci) => <td key={ci}>{cell}</td>)}</tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              }
-              if (line.startsWith('- ')) return <li key={i}>{line.slice(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').split(/(<strong>.*?<\/strong>)/).map((part, pi) => part.startsWith('<strong>') ? <strong key={pi}>{part.replace(/<\/?strong>/g, '')}</strong> : part)}</li>;
-              if (line.match(/^\d+\.\s/)) return <li key={i}>{line.replace(/^\d+\.\s/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').split(/(<strong>.*?<\/strong>)/).map((part, pi) => part.startsWith('<strong>') ? <strong key={pi}>{part.replace(/<\/?strong>/g, '')}</strong> : part)}</li>;
-              if (line.trim() === '') return <br key={i} />;
-              return <p key={i}>{line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').split(/(<strong>.*?<\/strong>)/).map((part, pi) => part.startsWith('<strong>') ? <strong key={pi}>{part.replace(/<\/?strong>/g, '')}</strong> : part)}</p>;
-            })}
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
           </div>
         </article>
 
