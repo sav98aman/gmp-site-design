@@ -10,6 +10,8 @@ import IPODetail from "./pages/IPODetail";
 import Analytics from "./pages/Analytics";
 import Market from "./pages/Market";
 import PaperTrading from "./pages/PaperTrading";
+import Blog from "./pages/Blog";
+import BlogPostPage from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
