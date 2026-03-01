@@ -30,6 +30,8 @@ const App = () => (
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/ipo/:ipoId" element={<IPODetail />} />
             <Route path="/paper-trading" element={<PaperTrading />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
