@@ -19,7 +19,7 @@ import {
   type Order, type Position, type Holding, type FundsData, type Segment, type FutureContract,
   type OrderSide, INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, formatINR,
 } from "@/data/paperTradingData";
-import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers, Zap, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 type BottomTab = 'positions' | 'orders' | 'holdings';
@@ -32,6 +32,13 @@ const SEGMENT_LABELS: Record<MainTab, string> = {
   CNC: 'Long-Term (CNC)',
 };
 
+const SEGMENT_ICONS: Record<MainTab, typeof Activity> = {
+  EQ: Activity,
+  FUT: LineChart,
+  OPT: Layers,
+  CNC: Package,
+};
+
 export default function PaperTrading() {
   const isMobile = useIsMobile();
   const [segment, setSegment] = useState<MainTab>('EQ');
@@ -41,7 +48,6 @@ export default function PaperTrading() {
   const [funds, setFunds] = useState<FundsData>(INITIAL_FUNDS);
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
 
-  // Order drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSide, setDrawerSide] = useState<OrderSide>('BUY');
 
@@ -216,63 +222,117 @@ export default function PaperTrading() {
     futurePrice: segment === 'FUT' ? selectedFuture?.ltp : undefined,
   };
 
-  // Shared components
+  const changePercent = selectedStock ? getChangePercent(selectedStock) : 0;
+  const changeAmt = selectedStock ? getChangeAmount(selectedStock) : 0;
+
+  // ── Segment Tabs ──
   const segmentTabs = (
-    <div className="flex items-center gap-0.5 overflow-x-auto py-1">
-      {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => (
-        <button key={seg} onClick={() => setSegment(seg)}
-          className={cn(
-            "flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
-            segment === seg ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-          )}
-        >
-          {seg === 'EQ' && <Activity className="h-3 w-3" />}
-          {seg === 'FUT' && <LineChart className="h-3 w-3" />}
-          {seg === 'OPT' && <Layers className="h-3 w-3" />}
-          {seg === 'CNC' && <Package className="h-3 w-3" />}
-          {seg}
-          {!isMobile && <span className="text-[10px] opacity-70 hidden sm:inline">· {SEGMENT_LABELS[seg]}</span>}
-        </button>
-      ))}
+    <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/60 backdrop-blur-sm">
+      {(Object.keys(SEGMENT_LABELS) as MainTab[]).map(seg => {
+        const Icon = SEGMENT_ICONS[seg];
+        return (
+          <button key={seg} onClick={() => setSegment(seg)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200",
+              segment === seg
+                ? "bg-background text-foreground shadow-sm border border-border/50"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {seg}
+            {!isMobile && <span className="text-[10px] opacity-60 hidden lg:inline">{SEGMENT_LABELS[seg]}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 
-  const buyButtons = selectedStock && (
-    <div className="grid grid-cols-2 gap-2">
-      <button onClick={openBuy}
-        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
-      >
-        <TrendingUp className="h-4 w-4" /> BUY
-      </button>
-      <button onClick={openSell}
-        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
-      >
-        <TrendingDown className="h-4 w-4" /> SELL
-      </button>
+  // ── Stock Ticker Header ──
+  const stockHeader = selectedStock && (
+    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-display text-lg font-bold tracking-tight">{selectedStock.symbol}</h2>
+            <span className="text-xs text-muted-foreground">{selectedStock.name}</span>
+            {(segment === 'FUT' || segment === 'OPT') && (
+              <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] font-semibold">F&O</Badge>
+            )}
+          </div>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-2xl font-bold tracking-tight">₹{selectedStock.livePrice.toFixed(2)}</span>
+            <span className={cn(
+              "flex items-center gap-1 text-sm font-bold px-2 py-0.5 rounded-md",
+              changePercent >= 0
+                ? "text-[hsl(var(--status-live))] bg-[hsl(var(--status-live)/0.1)]"
+                : "text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.1)]"
+            )}>
+              {changePercent >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {changeAmt >= 0 ? "+" : ""}{changeAmt.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={openBuy}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-live)/0.25)] hover:shadow-[hsl(var(--status-live)/0.4)] hover:scale-[1.02] transition-all active:scale-[0.98]"
+          ><TrendingUp className="h-4 w-4" /> BUY</button>
+          <button onClick={openSell}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-closed)/0.25)] hover:shadow-[hsl(var(--status-closed)/0.4)] hover:scale-[1.02] transition-all active:scale-[0.98]"
+          ><TrendingDown className="h-4 w-4" /> SELL</button>
+        </div>
+      </div>
+      {/* Stats row */}
+      <div className="flex gap-4 mt-3 text-[11px] border-t border-border/50 pt-3">
+        {[
+          { label: 'High', value: selectedStock.dayHigh.toFixed(2) },
+          { label: 'Low', value: selectedStock.dayLow.toFixed(2) },
+          { label: 'Volume', value: `${(selectedStock.volume / 100000).toFixed(2)}L` },
+          ...(!isMobile ? [
+            { label: '52W High', value: String(selectedStock.weekHigh52) },
+            { label: '52W Low', value: String(selectedStock.weekLow52) },
+          ] : []),
+        ].map(stat => (
+          <div key={stat.label} className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">{stat.label}</span>
+            <span className="font-mono font-semibold text-foreground">{stat.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
+  // ── Bottom Tabs ──
   const bottomTabs = (
-    <div className="border-t border-border">
-      <div className="flex items-center gap-1 px-3 pt-2 border-b border-border">
+    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
+      <div className="flex items-center gap-0 border-b border-border bg-muted/30">
         {([
           { key: 'positions' as BottomTab, label: 'Positions', icon: LayoutGrid, count: positions.length },
           { key: 'orders' as BottomTab, label: 'Orders', icon: BookOpen, count: openOrdersCount },
           { key: 'holdings' as BottomTab, label: 'Holdings', icon: Package, count: holdings.length },
         ]).map(tab => (
           <button key={tab.key} onClick={() => setBottomTab(tab.key)}
-            className={cn("flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-t transition-colors",
-              bottomTab === tab.key ? "bg-background border border-border border-b-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-3 text-xs font-semibold transition-all relative",
+              bottomTab === tab.key
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            <tab.icon className="h-3 w-3" />
+            <tab.icon className="h-3.5 w-3.5" />
             {tab.label}
             {tab.count > 0 && (
-              <span className="bg-primary text-primary-foreground rounded-full text-[9px] w-3.5 h-3.5 flex items-center justify-center font-bold">{tab.count}</span>
+              <span className="bg-primary text-primary-foreground rounded-full text-[9px] w-4 h-4 flex items-center justify-center font-bold">
+                {tab.count}
+              </span>
+            )}
+            {bottomTab === tab.key && (
+              <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
             )}
           </button>
         ))}
       </div>
-      <div className="p-3 overflow-x-auto">
+      <div className="p-4 overflow-x-auto">
         {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
         {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
         {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
@@ -280,54 +340,72 @@ export default function PaperTrading() {
     </div>
   );
 
-  const stockTickerInfo = selectedStock && (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-xl font-bold">{selectedStock.livePrice.toFixed(2)}</span>
-        <span className={cn("flex items-center gap-0.5 text-sm font-semibold", getChangePercent(selectedStock) >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
-          {getChangePercent(selectedStock) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-          {getChangeAmount(selectedStock) >= 0 ? "+" : ""}{getChangeAmount(selectedStock).toFixed(2)}
-          ({getChangePercent(selectedStock) >= 0 ? "+" : ""}{getChangePercent(selectedStock).toFixed(2)}%)
-        </span>
-      </div>
-      <div className="flex gap-3 text-[10px] text-muted-foreground flex-wrap">
-        <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
-        <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
-        <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
-        {!isMobile && (
-          <>
-            <span>52W H: <span className="text-foreground font-mono">{selectedStock.weekHigh52}</span></span>
-            <span>52W L: <span className="text-foreground font-mono">{selectedStock.weekLow52}</span></span>
-          </>
-        )}
-      </div>
+  // ── Mobile Buy/Sell ──
+  const mobileBuyButtons = selectedStock && (
+    <div className="grid grid-cols-2 gap-3">
+      <button onClick={openBuy}
+        className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-live)/0.3)] hover:opacity-90 transition-all active:scale-[0.97]"
+      >
+        <TrendingUp className="h-4 w-4" /> BUY
+      </button>
+      <button onClick={openSell}
+        className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-closed)/0.3)] hover:opacity-90 transition-all active:scale-[0.97]"
+      >
+        <TrendingDown className="h-4 w-4" /> SELL
+      </button>
     </div>
   );
 
-  // --- MOBILE LAYOUT ---
+  // ── MOBILE LAYOUT ──
   if (isMobile) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Header />
         <FundsBar funds={funds} onReset={handleReset} />
 
-        <div className="border-b border-border bg-card/30 px-2">{segmentTabs}</div>
+        <div className="px-3 py-2 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-20">
+          {segmentTabs}
+        </div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-3">
-            {/* Stock Search */}
             <StockSearchDropdown selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
 
-            {/* Price ticker */}
-            {stockTickerInfo}
+            {/* Mobile stock info */}
+            {selectedStock && (
+              <div className="rounded-xl border border-border bg-card/80 p-3">
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="font-mono text-xl font-bold">₹{selectedStock.livePrice.toFixed(2)}</span>
+                  <span className={cn(
+                    "flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded",
+                    changePercent >= 0
+                      ? "text-[hsl(var(--status-live))] bg-[hsl(var(--status-live)/0.1)]"
+                      : "text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.1)]"
+                  )}>
+                    {changePercent >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {changeAmt >= 0 ? "+" : ""}{changeAmt.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
+                  </span>
+                </div>
+                <div className="flex gap-3 text-[10px] text-muted-foreground">
+                  <span>H: <span className="text-foreground font-mono">{selectedStock.dayHigh.toFixed(2)}</span></span>
+                  <span>L: <span className="text-foreground font-mono">{selectedStock.dayLow.toFixed(2)}</span></span>
+                  <span>Vol: <span className="text-foreground font-mono">{(selectedStock.volume / 100000).toFixed(2)}L</span></span>
+                </div>
+              </div>
+            )}
 
-            {/* Chart or Contracts */}
-            {selectedStock && (segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
+            {selectedStock && (segment === 'EQ' || segment === 'CNC') && (
+              <div className="rounded-xl border border-border overflow-hidden">
+                <StockPriceChart stock={selectedStock} />
+              </div>
+            )}
 
             {selectedStock && segment === 'FUT' && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <LineChart className="h-4 w-4 text-primary" />
+              <div className="rounded-xl border border-border bg-card/80 p-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-6 w-6 rounded-lg bg-primary/15 flex items-center justify-center">
+                    <LineChart className="h-3.5 w-3.5 text-primary" />
+                  </div>
                   <span className="font-semibold text-sm">Futures Contracts</span>
                 </div>
                 <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
@@ -335,9 +413,11 @@ export default function PaperTrading() {
             )}
 
             {selectedStock && segment === 'OPT' && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Layers className="h-4 w-4 text-primary" />
+              <div className="rounded-xl border border-border bg-card/80 p-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-6 w-6 rounded-lg bg-primary/15 flex items-center justify-center">
+                    <Layers className="h-3.5 w-3.5 text-primary" />
+                  </div>
                   <span className="font-semibold text-sm">Options Chain</span>
                   {selectedStrike && selectedOptionType && (
                     <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
@@ -347,10 +427,7 @@ export default function PaperTrading() {
               </div>
             )}
 
-            {/* Buy / Sell Buttons */}
-            {buyButtons}
-
-            {/* Positions / Orders / Holdings */}
+            {mobileBuyButtons}
             {bottomTabs}
           </div>
         </div>
@@ -360,92 +437,97 @@ export default function PaperTrading() {
     );
   }
 
-  // --- DESKTOP LAYOUT ---
+  // ── DESKTOP LAYOUT ──
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <FundsBar funds={funds} onReset={handleReset} />
 
-      <div className="border-b border-border bg-card/30 px-4">{segmentTabs}</div>
+      {/* Segment tabs bar */}
+      <div className="px-4 py-2 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="flex items-center justify-between">
+          {segmentTabs}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--status-live))] animate-pulse" />
+              <span>Paper Trading</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
         {/* Left: Watchlist */}
-        <div className="w-52 shrink-0 border-r border-border bg-card/30 overflow-hidden flex flex-col">
+        <div className="w-56 shrink-0 border-r border-border bg-card/40 backdrop-blur-sm overflow-hidden flex flex-col">
           <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
         </div>
 
-        {/* Center */}
-        <div className="flex-1 overflow-y-auto min-w-0">
+        {/* Center: Main Content */}
+        <div className="flex-1 overflow-y-auto min-w-0 bg-background/50">
           {selectedStock && (
-            <div className="p-3 space-y-3">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div>
-                  <span className="font-bold text-lg">{selectedStock.symbol}</span>
-                  <span className="text-xs text-muted-foreground ml-2">{selectedStock.name}</span>
-                  {(segment === 'FUT' || segment === 'OPT') && <Badge variant="outline" className="ml-2 text-[10px]">F&O</Badge>}
-                </div>
-                {stockTickerInfo}
-              </div>
+            <div className="p-4 space-y-4">
+              {/* Stock Header */}
+              {stockHeader}
 
-              {/* Chart with buy/sell overlay */}
-              <div className="relative">
-                {(segment === 'EQ' || segment === 'CNC') && <StockPriceChart stock={selectedStock} />}
-                {/* Floating buy/sell for desktop chart */}
-                <div className="absolute top-3 right-3 z-10 flex gap-2">
-                  <button onClick={openBuy}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-xs shadow-lg hover:opacity-90 transition-all"
-                  ><TrendingUp className="h-3.5 w-3.5" /> BUY</button>
-                  <button onClick={openSell}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-xs shadow-lg hover:opacity-90 transition-all"
-                  ><TrendingDown className="h-3.5 w-3.5" /> SELL</button>
+              {/* Chart */}
+              {(segment === 'EQ' || segment === 'CNC') && (
+                <div className="rounded-xl border border-border overflow-hidden bg-card/80 backdrop-blur-sm">
+                  <StockPriceChart stock={selectedStock} />
                 </div>
-              </div>
+              )}
 
+              {/* Futures */}
               {segment === 'FUT' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <LineChart className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">Futures Contracts</span>
-                    <span className="text-xs text-muted-foreground">— Select contract to trade</span>
-                    <div className="ml-auto flex gap-2">
-                      <button onClick={openBuy} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-[11px] hover:opacity-90"><TrendingUp className="h-3 w-3" /> BUY</button>
-                      <button onClick={openSell} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-[11px] hover:opacity-90"><TrendingDown className="h-3 w-3" /> SELL</button>
+                <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                      <LineChart className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-sm">Futures Contracts</span>
+                      <p className="text-xs text-muted-foreground">Select a contract to trade</p>
                     </div>
                   </div>
                   <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
                 </div>
               )}
 
+              {/* Options */}
               {segment === 'OPT' && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Layers className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-sm">Options Chain</span>
-                    <span className="text-xs text-muted-foreground">— Spot: {selectedStock.livePrice.toFixed(2)}</span>
-                    {selectedStrike && selectedOptionType && (
-                      <Badge variant="outline" className="text-xs">{selectedStrike} {selectedOptionType}</Badge>
-                    )}
-                    <div className="ml-auto flex gap-2">
-                      <button onClick={openBuy} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-[11px] hover:opacity-90"><TrendingUp className="h-3 w-3" /> BUY</button>
-                      <button onClick={openSell} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-[11px] hover:opacity-90"><TrendingDown className="h-3 w-3" /> SELL</button>
+                <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                      <Layers className="h-4 w-4 text-primary" />
                     </div>
+                    <div>
+                      <span className="font-semibold text-sm">Options Chain</span>
+                      <p className="text-xs text-muted-foreground">Spot: ₹{selectedStock.livePrice.toFixed(2)}</p>
+                    </div>
+                    {selectedStrike && selectedOptionType && (
+                      <Badge className="ml-auto bg-primary/15 text-primary border-primary/30 text-xs">{selectedStrike} {selectedOptionType}</Badge>
+                    )}
                   </div>
                   <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
                 </div>
               )}
+
+              {/* Bottom Tabs */}
+              {bottomTabs}
             </div>
           )}
-
-          {bottomTabs}
         </div>
 
         {/* Right: Order Panel */}
-        <div className="w-64 shrink-0 border-l border-border bg-card/30 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="text-xs font-semibold">Order Entry</span>
-              <Badge variant="outline" className="ml-auto text-[10px] px-1.5">{segment}</Badge>
+        <div className="w-72 shrink-0 border-l border-border bg-card/40 backdrop-blur-sm overflow-hidden flex flex-col">
+          <div className="p-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div>
+                <span className="text-sm font-semibold">Order Entry</span>
+                <Badge variant="outline" className="ml-2 text-[10px] px-1.5">{segment}</Badge>
+              </div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
