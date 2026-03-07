@@ -13,6 +13,7 @@ import PaperTrading from "./pages/PaperTrading";
 import Blog from "./pages/Blog";
 import BlogPostPage from "./pages/BlogPost";
 import Learning from "./pages/Learning";
+import ModuleDetail from "./pages/ModuleDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/learning" element={<Learning />} />
+            <Route path="/learning/:slug" element={<ModuleDetail />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
