@@ -12,6 +12,7 @@ import Market from "./pages/Market";
 import PaperTrading from "./pages/PaperTrading";
 import Blog from "./pages/Blog";
 import BlogPostPage from "./pages/BlogPost";
+import Learning from "./pages/Learning";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/paper-trading" element={<PaperTrading />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
+            <Route path="/learning" element={<Learning />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
