@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,15 +112,17 @@ export default function Learning() {
 
                         {/* Actions */}
                         <div className={cn("flex shrink-0", isMobile ? "flex-row gap-1.5" : "flex-col gap-1.5")}>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="text-xs gap-1 h-8"
-                          >
-                            <BookOpen className="h-3 w-3" />
-                            {isMobile ? "" : "View module"}
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
+                          <Link to={`/learning/${module.slug}`}>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="text-xs gap-1 h-8"
+                            >
+                              <BookOpen className="h-3 w-3" />
+                              {isMobile ? "" : "View module"}
+                              <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
                           {module.hasVideos && (
                             <Button variant="outline" size="sm" className="text-xs gap-1 h-8">
                               <PlayCircle className="h-3 w-3" />
