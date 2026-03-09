@@ -182,7 +182,7 @@ export default function PaperTrading() {
     } else {
       toast.info(`${orderData.orderType} order placed`);
     }
-  }, [selectedStock, segment, selectedFuture, funds.availableBalance]);
+  }, [selectedStock, segment, selectedFuture, selectedOptionLTP, funds.availableBalance]);
 
   const handleSquareOff = (position: Position) => {
     const stocks = (position.segment === 'FUT' || position.segment === 'OPT') ? getFnOStocks() : getEquityStocks();
