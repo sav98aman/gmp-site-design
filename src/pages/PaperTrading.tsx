@@ -18,18 +18,21 @@ import {
   type Order, type Position, type Holding, type FundsData, type Segment, type FutureContract,
   type OrderSide, INITIAL_FUNDS, generateOptionsChain, generateFutureContracts, formatINR,
 } from "@/data/paperTradingData";
-import { TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package, LineChart, Layers, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  TrendingUp, TrendingDown, Activity, LayoutGrid, BookOpen, Package,
+  LineChart, Layers
+} from "lucide-react";
 import { toast } from "sonner";
 
 type BottomTab = 'positions' | 'orders' | 'holdings';
 type MainTab = 'EQ' | 'FUT' | 'OPT' | 'CNC';
 
-const SEGMENT_CONFIG: Record<MainTab, { label: string; icon: typeof Activity; desc: string }> = {
-  EQ: { label: 'Intraday', icon: Activity, desc: 'Buy & sell same day' },
-  FUT: { label: 'Futures', icon: LineChart, desc: 'F&O contracts' },
-  OPT: { label: 'Options', icon: Layers, desc: 'CE & PE trading' },
-  CNC: { label: 'Delivery', icon: Package, desc: 'Long-term holdings' },
-};
+const SEGMENTS: { key: MainTab; label: string; icon: typeof Activity }[] = [
+  { key: 'EQ', label: 'Intraday', icon: Activity },
+  { key: 'FUT', label: 'Futures', icon: LineChart },
+  { key: 'OPT', label: 'Options', icon: Layers },
+  { key: 'CNC', label: 'Delivery', icon: Package },
+];
 
 export default function PaperTrading() {
   const isMobile = useIsMobile();
@@ -39,21 +42,19 @@ export default function PaperTrading() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [funds, setFunds] = useState<FundsData>(INITIAL_FUNDS);
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
-  const [bottomExpanded, setBottomExpanded] = useState(true);
-
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSide, setDrawerSide] = useState<OrderSide>('BUY');
 
-  const segmentStocks = useMemo(() => {
-    return (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
-  }, [segment]);
+  const segmentStocks = useMemo(() =>
+    (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks(),
+  [segment]);
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(segmentStocks[0] ?? null);
 
+  // Reset stock when segment changes if current stock isn't in new list
   useEffect(() => {
     const stocks = (segment === 'FUT' || segment === 'OPT') ? getFnOStocks() : getEquityStocks();
-    const current = selectedStock;
-    if (!current || !stocks.find(s => s.symbol === current.symbol)) {
+    if (!selectedStock || !stocks.find(s => s.symbol === selectedStock.symbol)) {
       setSelectedStock(stocks[0] ?? null);
     }
   }, [segment]);
@@ -83,39 +84,26 @@ export default function PaperTrading() {
     setSelectedFuture(undefined);
   };
 
-  const handleSelectOption = (strike: number, type: 'CE' | 'PE', _ltp: number) => {
-    setSelectedStrike(strike);
-    setSelectedOptionType(type);
-  };
-
-  const handleSelectFuture = (contract: FutureContract) => {
-    setSelectedFuture(contract);
-  };
-
   const openBuy = () => { setDrawerSide('BUY'); setDrawerOpen(true); };
   const openSell = () => { setDrawerSide('SELL'); setDrawerOpen(true); };
 
-  // ── Order Execution Logic ──
+  // ── Order placement ──
   const handlePlaceOrder = useCallback((orderData: Omit<Order, 'id' | 'timestamp' | 'status'>) => {
     if (!selectedStock) return;
-
     const ltp = segment === 'FUT' && selectedFuture ? selectedFuture.ltp : selectedStock.livePrice;
     const executedPrice = orderData.orderType === 'MARKET' ? ltp : orderData.price;
     const totalValue = orderData.qty * executedPrice;
     const marginRequired = segment === 'EQ' || segment === 'CNC' ? totalValue : totalValue * 0.12;
 
     if (marginRequired > funds.availableBalance) {
-      toast.error("Insufficient margin to place this order");
-      return;
+      toast.error("Insufficient margin"); return;
     }
 
-    const orderId = `ORD${Date.now()}`;
     const newOrder: Order = {
-      ...orderData, id: orderId, timestamp: new Date(),
+      ...orderData, id: `ORD${Date.now()}`, timestamp: new Date(),
       status: orderData.orderType === 'MARKET' ? 'EXECUTED' : 'OPEN',
       executedPrice: orderData.orderType === 'MARKET' ? executedPrice : undefined,
     };
-
     setOrders(prev => [...prev, newOrder]);
 
     if (orderData.orderType === 'MARKET') {
@@ -152,7 +140,7 @@ export default function PaperTrading() {
                 usedMargin: Math.max(0, f.usedMargin - marginRequired),
                 availableBalance: f.availableBalance + marginRequired + realizedPnL,
               }));
-              toast.success(`Position squared off! P&L: ${realizedPnL >= 0 ? '+' : ''}${formatINR(realizedPnL)}`);
+              toast.success(`Squared off! P&L: ${realizedPnL >= 0 ? '+' : ''}${formatINR(realizedPnL)}`);
               return prev.filter(p => p.id !== posId);
             }
             return prev.map(p => p.id === posId ? {
@@ -175,9 +163,9 @@ export default function PaperTrading() {
         ...f, usedMargin: f.usedMargin + marginRequired,
         availableBalance: f.availableBalance - marginRequired,
       }));
-      toast.success(`${orderData.side} order executed — ${orderData.symbol} @ ${formatINR(executedPrice)}`);
+      toast.success(`${orderData.side} ${orderData.symbol} @ ${formatINR(executedPrice)}`);
     } else {
-      toast.info(`${orderData.orderType} order placed for ${orderData.symbol}`);
+      toast.info(`${orderData.orderType} order placed`);
     }
   }, [selectedStock, segment, selectedFuture, funds.availableBalance]);
 
@@ -188,17 +176,6 @@ export default function PaperTrading() {
       setSelectedStock(stock);
       setDrawerSide(position.side === 'BUY' ? 'SELL' : 'BUY');
       setDrawerOpen(true);
-    } else {
-      const ltp = position.ltp;
-      const pnl = (ltp - position.avgPrice) * position.qty * (position.side === 'BUY' ? 1 : -1);
-      const marginReleased = position.qty * position.avgPrice * (position.segment === 'EQ' ? 1 : 0.12);
-      setPositions(prev => prev.filter(p => p.id !== position.id));
-      setFunds(f => ({
-        ...f, realizedPnL: f.realizedPnL + pnl,
-        usedMargin: Math.max(0, f.usedMargin - marginReleased),
-        availableBalance: f.availableBalance + marginReleased + pnl,
-      }));
-      toast.success(`Squared off ${position.symbol}! P&L: ${pnl >= 0 ? '+' : ''}${formatINR(pnl)}`);
     }
   };
 
@@ -209,10 +186,12 @@ export default function PaperTrading() {
 
   const handleReset = () => {
     setOrders([]); setPositions([]); setHoldings([]); setFunds(INITIAL_FUNDS);
-    toast.success("Paper trading reset! Starting fresh with ₹10,00,000");
+    toast.success("Reset! Starting fresh with ₹10,00,000");
   };
 
   const openOrdersCount = orders.filter(o => o.status === 'OPEN').length;
+  const changePercent = selectedStock ? getChangePercent(selectedStock) : 0;
+  const changeAmt = selectedStock ? getChangeAmount(selectedStock) : 0;
 
   const orderDrawerProps = {
     open: drawerOpen, onOpenChange: setDrawerOpen, stock: selectedStock,
@@ -224,253 +203,134 @@ export default function PaperTrading() {
     futurePrice: segment === 'FUT' ? selectedFuture?.ltp : undefined,
   };
 
-  const changePercent = selectedStock ? getChangePercent(selectedStock) : 0;
-  const changeAmt = selectedStock ? getChangeAmount(selectedStock) : 0;
-
-  const totalItemsCount = positions.length + openOrdersCount + holdings.length;
-
-  // ── Segment Tabs ──
+  // ──────────────────────────────
+  // SEGMENT TABS
+  // ──────────────────────────────
   const segmentTabs = (
-    <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/50 backdrop-blur-sm">
-      {(Object.keys(SEGMENT_CONFIG) as MainTab[]).map(seg => {
-        const cfg = SEGMENT_CONFIG[seg];
-        const Icon = cfg.icon;
-        const isActive = segment === seg;
+    <div className="flex items-center gap-0.5">
+      {SEGMENTS.map(seg => {
+        const isActive = segment === seg.key;
         return (
-          <button key={seg} onClick={() => setSegment(seg)}
+          <button key={seg.key} onClick={() => setSegment(seg.key)}
             className={cn(
-              "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
               isActive
-                ? "bg-background text-foreground shadow-sm border border-border/50"
-                : "text-muted-foreground hover:text-foreground hover:bg-background/40"
+                ? "bg-foreground text-background font-semibold"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
-            {cfg.label}
+            <seg.icon className="h-3 w-3" />
+            {seg.label}
           </button>
         );
       })}
     </div>
   );
 
-  // ── Stock Header Card ──
-  const stockHeaderCard = selectedStock && (
-    <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1.5">
-            <h2 className="font-display text-lg font-bold tracking-tight">{selectedStock.symbol}</h2>
-            <span className="text-xs text-muted-foreground truncate">{selectedStock.name}</span>
-            {(segment === 'FUT' || segment === 'OPT') && (
-              <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] font-semibold">F&O</Badge>
+  // ──────────────────────────────
+  // BOTTOM TABS (positions/orders/holdings)
+  // ──────────────────────────────
+  const bottomSection = (
+    <div className="border-t border-border bg-card/50">
+      <div className="flex items-center border-b border-border/50">
+        {([
+          { key: 'positions' as BottomTab, label: 'Positions', icon: LayoutGrid, count: positions.length },
+          { key: 'orders' as BottomTab, label: 'Orders', icon: BookOpen, count: openOrdersCount },
+          { key: 'holdings' as BottomTab, label: 'Holdings', icon: Package, count: holdings.length },
+        ]).map(tab => (
+          <button key={tab.key} onClick={() => setBottomTab(tab.key)}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative",
+              bottomTab === tab.key ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
-          </div>
-          <div className="flex items-baseline gap-3">
-            <span className="font-mono text-2xl font-bold tracking-tight">₹{selectedStock.livePrice.toFixed(2)}</span>
-            <span className={cn(
-              "flex items-center gap-1 text-sm font-bold px-2.5 py-0.5 rounded-lg",
-              changePercent >= 0
-                ? "text-[hsl(var(--status-live))] bg-[hsl(var(--status-live)/0.1)]"
-                : "text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.1)]"
-            )}>
-              {changePercent >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              {changeAmt >= 0 ? "+" : ""}{changeAmt.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
-            </span>
-          </div>
-        </div>
-        {/* Buy/Sell Buttons */}
-        <div className="flex gap-2">
-          <button onClick={openBuy}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-live)/0.25)] hover:shadow-[hsl(var(--status-live)/0.4)] hover:scale-[1.02] transition-all active:scale-[0.98]"
           >
-            <TrendingUp className="h-4 w-4" /> BUY
+            <tab.icon className="h-3 w-3" />
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="bg-muted text-muted-foreground rounded text-[9px] px-1 py-px font-mono">{tab.count}</span>
+            )}
+            {bottomTab === tab.key && <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-foreground rounded-full" />}
           </button>
-          <button onClick={openSell}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-closed)/0.25)] hover:shadow-[hsl(var(--status-closed)/0.4)] hover:scale-[1.02] transition-all active:scale-[0.98]"
-          >
-            <TrendingDown className="h-4 w-4" /> SELL
-          </button>
-        </div>
-      </div>
-      {/* Stats row */}
-      <div className="flex gap-4 mt-3 text-[11px] border-t border-border/50 pt-3">
-        {[
-          { label: 'Open', value: selectedStock.dayHigh.toFixed(2) },
-          { label: 'High', value: selectedStock.dayHigh.toFixed(2) },
-          { label: 'Low', value: selectedStock.dayLow.toFixed(2) },
-          { label: 'Vol', value: `${(selectedStock.volume / 100000).toFixed(1)}L` },
-          ...(!isMobile ? [
-            { label: '52W H', value: String(selectedStock.weekHigh52) },
-            { label: '52W L', value: String(selectedStock.weekLow52) },
-          ] : []),
-        ].map(stat => (
-          <div key={stat.label} className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">{stat.label}</span>
-            <span className="font-mono font-semibold text-foreground">{stat.value}</span>
-          </div>
         ))}
       </div>
-    </div>
-  );
-
-  // ── Collapsible Bottom Panel ──
-  const bottomPanel = (
-    <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden shadow-sm">
-      {/* Tab bar with expand/collapse */}
-      <div className="flex items-center border-b border-border bg-muted/20">
-        <div className="flex items-center flex-1">
-          {([
-            { key: 'positions' as BottomTab, label: 'Positions', icon: LayoutGrid, count: positions.length },
-            { key: 'orders' as BottomTab, label: 'Orders', icon: BookOpen, count: openOrdersCount },
-            { key: 'holdings' as BottomTab, label: 'Holdings', icon: Package, count: holdings.length },
-          ]).map(tab => (
-            <button key={tab.key}
-              onClick={() => {
-                if (bottomTab === tab.key) {
-                  setBottomExpanded(!bottomExpanded);
-                } else {
-                  setBottomTab(tab.key);
-                  setBottomExpanded(true);
-                }
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-3 text-xs font-semibold transition-all relative",
-                bottomTab === tab.key ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <tab.icon className="h-3.5 w-3.5" />
-              {tab.label}
-              {tab.count > 0 && (
-                <span className={cn(
-                  "rounded-full text-[9px] w-4 h-4 flex items-center justify-center font-bold",
-                  bottomTab === tab.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                )}>
-                  {tab.count}
-                </span>
-              )}
-              {bottomTab === tab.key && (
-                <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
-          ))}
-        </div>
-        <button onClick={() => setBottomExpanded(!bottomExpanded)} className="p-2 mr-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/50">
-          {bottomExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-        </button>
+      <div className="p-3 max-h-[280px] overflow-y-auto">
+        {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
+        {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
+        {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
       </div>
-      {/* Content */}
-      {bottomExpanded && (
-        <div className="p-4 max-h-[350px] overflow-y-auto">
-          {bottomTab === 'positions' && <PositionsTable positions={positions} onSquareOff={handleSquareOff} />}
-          {bottomTab === 'orders' && <OrderBook orders={orders} onCancelOrder={handleCancelOrder} />}
-          {bottomTab === 'holdings' && <HoldingsTable holdings={holdings} />}
-        </div>
-      )}
     </div>
   );
 
   // ══════════════════════════════
-  // MOBILE LAYOUT
+  // MOBILE
   // ══════════════════════════════
   if (isMobile) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <FundsBar funds={funds} onReset={handleReset} />
+        <FundsBar funds={funds} onReset={handleReset} positionsCount={positions.length} ordersCount={openOrdersCount} />
 
-        {/* Sticky segment tabs */}
-        <div className="px-3 py-2 border-b border-border bg-background/90 backdrop-blur-md sticky top-0 z-20">
-          <div className="overflow-x-auto scrollbar-hide">
-            {segmentTabs}
-          </div>
+        {/* Segment tabs */}
+        <div className="px-3 py-2 border-b border-border sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
+          <div className="overflow-x-auto">{segmentTabs}</div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-3 space-y-3">
-            {/* Search */}
             <StockSearchDropdown selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
 
-            {/* Stock card with inline buy/sell */}
+            {/* Stock ticker + Buy/Sell */}
             {selectedStock && (
-              <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-3 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="font-bold text-sm font-display">{selectedStock.symbol}</span>
-                      {(segment === 'FUT' || segment === 'OPT') && (
-                        <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px]">F&O</Badge>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">{selectedStock.name}</span>
+              <div className="flex items-center justify-between gap-3 px-1">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-display font-bold text-base">{selectedStock.symbol}</span>
+                    {(segment === 'FUT' || segment === 'OPT') && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0">F&O</Badge>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono text-lg font-bold block">₹{selectedStock.livePrice.toFixed(2)}</span>
-                    <span className={cn(
-                      "inline-flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded-md",
-                      changePercent >= 0
-                        ? "text-[hsl(var(--status-live))] bg-[hsl(var(--status-live)/0.1)]"
-                        : "text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.1)]"
-                    )}>
-                      {changePercent >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="font-mono text-lg font-bold">₹{selectedStock.livePrice.toFixed(2)}</span>
+                    <span className={cn("text-xs font-mono font-semibold", changePercent >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
                       {changeAmt >= 0 ? "+" : ""}{changeAmt.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
                     </span>
                   </div>
                 </div>
-                {/* Buy/Sell buttons */}
-                <div className="grid grid-cols-2 gap-2 mt-3">
+                <div className="flex gap-1.5">
                   <button onClick={openBuy}
-                    className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[hsl(var(--status-live))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-live)/0.3)] active:scale-[0.97] transition-all"
-                  >
-                    <TrendingUp className="h-4 w-4" /> BUY
-                  </button>
+                    className="px-4 py-2 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-xs active:scale-95 transition-transform"
+                  >B</button>
                   <button onClick={openSell}
-                    className="flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[hsl(var(--status-closed))] text-white font-bold text-sm shadow-lg shadow-[hsl(var(--status-closed)/0.3)] active:scale-[0.97] transition-all"
-                  >
-                    <TrendingDown className="h-4 w-4" /> SELL
-                  </button>
+                    className="px-4 py-2 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-xs active:scale-95 transition-transform"
+                  >S</button>
                 </div>
               </div>
             )}
 
-            {/* Chart for EQ/CNC */}
+            {/* Chart */}
             {selectedStock && (segment === 'EQ' || segment === 'CNC') && (
-              <div className="rounded-2xl border border-border overflow-hidden shadow-sm">
+              <div className="rounded-lg border border-border overflow-hidden">
                 <StockPriceChart stock={selectedStock} />
               </div>
             )}
 
             {/* Futures */}
             {selectedStock && segment === 'FUT' && (
-              <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
-                    <LineChart className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <span className="font-semibold text-sm font-display">Futures Contracts</span>
-                </div>
-                <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
-              </div>
+              <FuturesPanel contracts={futureContracts} onSelectContract={(c) => setSelectedFuture(c)} selectedExpiry={selectedFuture?.expiry} />
             )}
 
             {/* Options */}
             {selectedStock && segment === 'OPT' && (
-              <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center">
-                    <Layers className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                  <span className="font-semibold text-sm font-display">Options Chain</span>
-                  {selectedStrike && selectedOptionType && (
-                    <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
-                  )}
-                </div>
-                <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
+              <div className="rounded-lg border border-border overflow-hidden">
+                <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice}
+                  onSelectOption={(s, t) => { setSelectedStrike(s); setSelectedOptionType(t); }}
+                  selectedStrike={selectedStrike} selectedType={selectedOptionType} />
               </div>
             )}
-
-            {/* Bottom panel */}
-            {bottomPanel}
           </div>
+
+          {/* Bottom tabs */}
+          {bottomSection}
         </div>
 
         <OrderDrawer {...orderDrawerProps} />
@@ -479,87 +339,114 @@ export default function PaperTrading() {
   }
 
   // ══════════════════════════════
-  // DESKTOP LAYOUT
+  // DESKTOP — Kite-style: watchlist | chart + data
   // ══════════════════════════════
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <FundsBar funds={funds} onReset={handleReset} />
 
-      {/* Segment tabs bar */}
-      <div className="px-4 py-2.5 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
-          {segmentTabs}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--status-live))] animate-pulse" />
-              <span className="font-medium">Paper Trading</span>
-            </div>
-            {totalItemsCount > 0 && (
-              <Badge variant="outline" className="text-[10px] font-mono">{totalItemsCount} active</Badge>
-            )}
-          </div>
+      {/* Dashboard cards row */}
+      <FundsBar funds={funds} onReset={handleReset} positionsCount={positions.length} ordersCount={openOrdersCount} />
+
+      {/* Segment bar */}
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+        {segmentTabs}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--status-live))] animate-pulse" />
+          Paper Trading
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
-        {/* Left: Watchlist */}
-        <div className="w-60 shrink-0 border-r border-border bg-card/30 backdrop-blur-sm overflow-hidden flex flex-col">
+      {/* Main area */}
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 180px)' }}>
+        {/* Watchlist */}
+        <div className="w-52 shrink-0 border-r border-border overflow-hidden flex flex-col bg-card/30">
           <WatchlistPanel selectedStock={selectedStock} onSelectStock={handleSelectStock} segment={segment} />
         </div>
 
-        {/* Center: Main content */}
-        <div className="flex-1 overflow-y-auto min-w-0">
+        {/* Center: stock info + chart + data */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {selectedStock && (
-            <div className="p-5 space-y-4 max-w-5xl mx-auto">
-              {/* Stock header with buy/sell */}
-              {stockHeaderCard}
-
-              {/* Chart for EQ/CNC */}
-              {(segment === 'EQ' || segment === 'CNC') && (
-                <div className="rounded-2xl border border-border overflow-hidden bg-card/80 backdrop-blur-sm shadow-sm">
-                  <StockPriceChart stock={selectedStock} />
-                </div>
-              )}
-
-              {/* Futures */}
-              {segment === 'FUT' && (
-                <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-5 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center">
-                      <LineChart className="h-4.5 w-4.5 text-primary" />
-                    </div>
-                    <div>
-                      <span className="font-semibold text-sm font-display">Futures Contracts</span>
-                      <p className="text-xs text-muted-foreground">Select a contract to trade</p>
+            <>
+              {/* Stock header bar — compact like Kite */}
+              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between bg-card/40">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-display text-base font-bold">{selectedStock.symbol}</h2>
+                      <span className="text-[11px] text-muted-foreground">{selectedStock.name}</span>
+                      {(segment === 'FUT' || segment === 'OPT') && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">F&O</Badge>
+                      )}
                     </div>
                   </div>
-                  <FuturesPanel contracts={futureContracts} onSelectContract={handleSelectFuture} selectedExpiry={selectedFuture?.expiry} />
-                </div>
-              )}
-
-              {/* Options */}
-              {segment === 'OPT' && (
-                <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm p-5 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-9 w-9 rounded-xl bg-primary/15 flex items-center justify-center">
-                      <Layers className="h-4.5 w-4.5 text-primary" />
-                    </div>
-                    <div>
-                      <span className="font-semibold text-sm font-display">Options Chain</span>
-                      <p className="text-xs text-muted-foreground">Spot: ₹{selectedStock.livePrice.toFixed(2)}</p>
-                    </div>
-                    {selectedStrike && selectedOptionType && (
-                      <Badge className="ml-auto bg-primary/15 text-primary border-primary/30 text-xs font-semibold">{selectedStrike} {selectedOptionType}</Badge>
-                    )}
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-xl font-bold">₹{selectedStock.livePrice.toFixed(2)}</span>
+                    <span className={cn(
+                      "text-sm font-mono font-bold",
+                      changePercent >= 0 ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]"
+                    )}>
+                      {changeAmt >= 0 ? "+" : ""}{changeAmt.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
+                    </span>
                   </div>
-                  <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice} onSelectOption={handleSelectOption} selectedStrike={selectedStrike} selectedType={selectedOptionType} />
+                  {/* Mini stats */}
+                  <div className="hidden lg:flex gap-3 text-[10px] text-muted-foreground ml-4">
+                    <span>H: <span className="font-mono text-foreground">{selectedStock.dayHigh.toFixed(2)}</span></span>
+                    <span>L: <span className="font-mono text-foreground">{selectedStock.dayLow.toFixed(2)}</span></span>
+                    <span>Vol: <span className="font-mono text-foreground">{(selectedStock.volume / 100000).toFixed(1)}L</span></span>
+                  </div>
                 </div>
-              )}
+                {/* Buy / Sell */}
+                <div className="flex gap-2">
+                  <button onClick={openBuy}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[hsl(var(--status-live))] text-white font-bold text-xs hover:opacity-90 active:scale-[0.97] transition-all"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" /> BUY
+                  </button>
+                  <button onClick={openSell}
+                    className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-[hsl(var(--status-closed))] text-white font-bold text-xs hover:opacity-90 active:scale-[0.97] transition-all"
+                  >
+                    <TrendingDown className="h-3.5 w-3.5" /> SELL
+                  </button>
+                </div>
+              </div>
 
-              {/* Positions / Orders / Holdings */}
-              {bottomPanel}
-            </div>
+              {/* Chart / Content area */}
+              <div className="flex-1 overflow-y-auto">
+                {/* Chart for EQ/CNC */}
+                {(segment === 'EQ' || segment === 'CNC') && (
+                  <div className="border-b border-border">
+                    <StockPriceChart stock={selectedStock} />
+                  </div>
+                )}
+
+                {/* Futures */}
+                {segment === 'FUT' && (
+                  <div className="p-4">
+                    <FuturesPanel contracts={futureContracts} onSelectContract={(c) => setSelectedFuture(c)} selectedExpiry={selectedFuture?.expiry} />
+                  </div>
+                )}
+
+                {/* Options */}
+                {segment === 'OPT' && (
+                  <div className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-sm font-semibold font-display">Options Chain</span>
+                      <span className="text-xs text-muted-foreground">Spot: ₹{selectedStock.livePrice.toFixed(2)}</span>
+                      {selectedStrike && selectedOptionType && (
+                        <Badge variant="outline" className="ml-auto text-xs">{selectedStrike} {selectedOptionType}</Badge>
+                      )}
+                    </div>
+                    <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice}
+                      onSelectOption={(s, t) => { setSelectedStrike(s); setSelectedOptionType(t); }}
+                      selectedStrike={selectedStrike} selectedType={selectedOptionType} />
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom: Positions / Orders / Holdings */}
+              {bottomSection}
+            </>
           )}
         </div>
       </div>
