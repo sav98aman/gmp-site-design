@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type Stock } from "@/data/mockStockData";
 import {
@@ -37,23 +36,16 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
   const totalValue = effectiveQty * executionPrice;
   const requiredMargin = segment === 'EQ' || segment === 'CNC' ? totalValue : totalValue * 0.12;
   const canAfford = requiredMargin <= availableBalance;
-
   const productOptions = PRODUCT_TYPES[segment];
 
   const handleSubmit = () => {
     if (!stock) return;
-    const orderPrice = orderType === 'MARKET' ? ltp : Number(price);
     onPlaceOrder({
-      symbol: stock.symbol,
-      segment,
-      side,
-      orderType,
+      symbol: stock.symbol, segment, side, orderType,
       qty: effectiveQty,
-      price: orderPrice,
+      price: orderType === 'MARKET' ? ltp : Number(price),
       triggerPrice: (orderType === 'SL' || orderType === 'SL-M') ? Number(triggerPrice) : undefined,
-      productType,
-      expiry: selectedExpiry,
-      strikePrice: selectedStrike,
+      productType, expiry: selectedExpiry, strikePrice: selectedStrike,
       optionType: selectedOptionType,
       lotSize: (segment === 'FUT' || segment === 'OPT') ? lotSize : undefined,
     });
@@ -61,164 +53,144 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
 
   if (!stock) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <AlertCircle className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground">Select a stock to place orders</p>
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4">
+        Select a stock to trade
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 p-4 h-full overflow-y-auto">
-      {/* Stock Info */}
-      <div className="flex items-center justify-between pb-2 border-b border-border">
-        <div>
-          <span className="font-bold text-sm">{stock.symbol}</span>
-          {segment !== 'EQ' && segment !== 'CNC' && selectedExpiry && (
-            <span className="text-xs text-muted-foreground ml-1">{selectedExpiry}</span>
+    <div className="flex flex-col h-full">
+      {/* Buy/Sell tabs */}
+      <div className="grid grid-cols-2">
+        <button onClick={() => setSide('BUY')}
+          className={cn(
+            "py-2.5 text-xs font-bold transition-colors",
+            side === 'BUY'
+              ? "bg-[hsl(var(--status-live))] text-white"
+              : "bg-muted text-muted-foreground hover:text-foreground"
           )}
-          {segment === 'OPT' && selectedStrike && selectedOptionType && (
-            <Badge variant="outline" className="ml-1 text-xs px-1 py-0">{selectedStrike} {selectedOptionType}</Badge>
+        >BUY</button>
+        <button onClick={() => setSide('SELL')}
+          className={cn(
+            "py-2.5 text-xs font-bold transition-colors",
+            side === 'SELL'
+              ? "bg-[hsl(var(--status-closed))] text-white"
+              : "bg-muted text-muted-foreground hover:text-foreground"
           )}
+        >SELL</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {/* Stock + LTP */}
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-xs">{stock.symbol}</span>
+          <span className="font-mono text-xs font-bold">{formatINR(ltp)}</span>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-sm font-bold">{formatINR(ltp)}</div>
-          <div className={cn("text-xs", stock.livePrice > stock.previousClose ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
-            {stock.livePrice > stock.previousClose ? "+" : ""}{((stock.livePrice - stock.previousClose) / stock.previousClose * 100).toFixed(2)}%
+
+        {/* Product Type */}
+        <div>
+          <Label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Product</Label>
+          <div className="flex gap-1">
+            {productOptions.map(p => (
+              <button key={p} onClick={() => setProductType(p)}
+                className={cn(
+                  "flex-1 py-1.5 rounded text-[11px] font-medium border transition-all",
+                  productType === p
+                    ? "border-foreground text-foreground bg-foreground/5"
+                    : "border-border text-muted-foreground hover:border-muted-foreground"
+                )}
+              >{p}</button>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* BUY / SELL Toggle */}
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-muted">
-        <button
-          onClick={() => setSide('BUY')}
-          className={cn("py-2 rounded-md text-xs font-bold transition-all", side === 'BUY' ? "bg-[hsl(var(--status-live))] text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}
-        >
-          <TrendingUp className="h-3 w-3 inline mr-1" />BUY
-        </button>
-        <button
-          onClick={() => setSide('SELL')}
-          className={cn("py-2 rounded-md text-xs font-bold transition-all", side === 'SELL' ? "bg-[hsl(var(--status-closed))] text-white shadow-sm" : "text-muted-foreground hover:text-foreground")}
-        >
-          <TrendingDown className="h-3 w-3 inline mr-1" />SELL
-        </button>
-      </div>
-
-      {/* Product Type */}
-      <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">Product</Label>
-        <div className="flex gap-1">
-          {productOptions.map((p) => (
-            <button
-              key={p}
-              onClick={() => setProductType(p)}
-              className={cn("flex-1 py-1.5 rounded text-xs font-medium border transition-all", productType === p ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-border/80")}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Order Type */}
-      <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">Order Type</Label>
-        <div className="grid grid-cols-2 gap-1">
-          {(['MARKET', 'LIMIT', 'SL', 'SL-M'] as OrderType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setOrderType(t)}
-              className={cn("py-1.5 rounded text-xs font-medium border transition-all", orderType === t ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-border/80")}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Quantity */}
-      <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">
-          Qty {(segment === 'FUT' || segment === 'OPT') && <span className="text-[10px]">(lots) × {lotSize} = {effectiveQty} shares</span>}
-        </Label>
-        <Input
-          type="number"
-          value={qty}
-          onChange={e => setQty(e.target.value)}
-          min="1"
-          className="h-8 text-sm font-mono"
-        />
-      </div>
-
-      {/* Price (for LIMIT & SL) */}
-      {(orderType === 'LIMIT' || orderType === 'SL') && (
+        {/* Qty */}
         <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Price</Label>
-          <Input
-            type="number"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            placeholder={ltp.toFixed(2)}
-            className="h-8 text-sm font-mono"
-          />
+          <Label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">
+            Qty {(segment === 'FUT' || segment === 'OPT') && <span className="normal-case">× {lotSize} = {effectiveQty}</span>}
+          </Label>
+          <Input type="number" value={qty} onChange={e => setQty(e.target.value)} min="1"
+            className="h-8 text-xs font-mono bg-muted/30 border-border" />
         </div>
-      )}
 
-      {/* Trigger Price (for SL & SL-M) */}
-      {(orderType === 'SL' || orderType === 'SL-M') && (
+        {/* Price */}
         <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Trigger Price</Label>
-          <Input
-            type="number"
-            value={triggerPrice}
-            onChange={e => setTriggerPrice(e.target.value)}
-            placeholder={ltp.toFixed(2)}
-            className="h-8 text-sm font-mono"
-          />
+          <Label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Price</Label>
+          <div className="flex gap-1">
+            {(['MARKET', 'LIMIT'] as OrderType[]).map(t => (
+              <button key={t} onClick={() => setOrderType(t)}
+                className={cn(
+                  "flex-1 py-1.5 rounded text-[11px] font-medium border transition-all",
+                  orderType === t
+                    ? "border-foreground text-foreground bg-foreground/5"
+                    : "border-border text-muted-foreground"
+                )}
+              >{t}</button>
+            ))}
+            {(['SL', 'SL-M'] as OrderType[]).map(t => (
+              <button key={t} onClick={() => setOrderType(t)}
+                className={cn(
+                  "flex-1 py-1.5 rounded text-[11px] font-medium border transition-all",
+                  orderType === t
+                    ? "border-foreground text-foreground bg-foreground/5"
+                    : "border-border text-muted-foreground"
+                )}
+              >{t}</button>
+            ))}
+          </div>
         </div>
-      )}
 
-      {/* Order Summary */}
-      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-xs">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Exec. Price</span>
-          <span className="font-mono">{formatINR(executionPrice)}</span>
+        {(orderType === 'LIMIT' || orderType === 'SL') && (
+          <Input type="number" value={price} onChange={e => setPrice(e.target.value)}
+            placeholder={`Price (${ltp.toFixed(2)})`}
+            className="h-8 text-xs font-mono bg-muted/30 border-border" />
+        )}
+
+        {(orderType === 'SL' || orderType === 'SL-M') && (
+          <Input type="number" value={triggerPrice} onChange={e => setTriggerPrice(e.target.value)}
+            placeholder={`Trigger (${ltp.toFixed(2)})`}
+            className="h-8 text-xs font-mono bg-muted/30 border-border" />
+        )}
+
+        {/* Summary */}
+        <div className="space-y-1 text-[11px] pt-2 border-t border-border/50">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Order Value</span>
+            <span className="font-mono">{formatINR(totalValue)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Req. Margin</span>
+            <span className={cn("font-mono font-semibold", canAfford ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
+              {formatINR(requiredMargin)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Available</span>
+            <span className="font-mono">{formatINR(availableBalance)}</span>
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Quantity</span>
-          <span className="font-mono">{effectiveQty.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Order Value</span>
-          <span className="font-mono">{formatINR(totalValue)}</span>
-        </div>
-        <div className="flex justify-between border-t border-border pt-1.5">
-          <span className="text-muted-foreground font-medium">Req. Margin</span>
-          <span className={cn("font-mono font-bold", canAfford ? "text-[hsl(var(--status-live))]" : "text-[hsl(var(--status-closed))]")}>
-            {formatINR(requiredMargin)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Available</span>
-          <span className="font-mono">{formatINR(availableBalance)}</span>
-        </div>
+
+        {!canAfford && (
+          <div className="flex items-center gap-1.5 text-[10px] text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.08)] rounded p-2">
+            <AlertCircle className="h-3 w-3 shrink-0" /> Insufficient margin
+          </div>
+        )}
       </div>
 
-      {!canAfford && (
-        <div className="flex items-center gap-2 text-xs text-[hsl(var(--status-closed))] bg-[hsl(var(--status-closed)/0.1)] rounded-lg p-2 border border-[hsl(var(--status-closed)/0.2)]">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          Insufficient margin
-        </div>
-      )}
-
-      <Button
-        onClick={handleSubmit}
-        disabled={!canAfford || Number(qty) <= 0}
-        className={cn("w-full font-bold text-sm h-10 mt-auto", side === 'BUY' ? "bg-[hsl(var(--status-live))] hover:bg-[hsl(var(--status-live)/0.9)]" : "bg-[hsl(var(--status-closed))] hover:bg-[hsl(var(--status-closed)/0.9)]")}
-      >
-        {side} {stock.symbol}
-      </Button>
+      {/* Place Order Button */}
+      <div className="p-3 border-t border-border">
+        <Button onClick={handleSubmit} disabled={!canAfford || Number(qty) <= 0}
+          className={cn(
+            "w-full font-bold text-xs h-9",
+            side === 'BUY'
+              ? "bg-[hsl(var(--status-live))] hover:bg-[hsl(var(--status-live)/0.9)] text-white"
+              : "bg-[hsl(var(--status-closed))] hover:bg-[hsl(var(--status-closed)/0.9)] text-white"
+          )}
+        >
+          {side} {stock.symbol}
+        </Button>
+      </div>
     </div>
   );
 }
