@@ -22,7 +22,7 @@ interface OrderPanelProps {
   optionPrice?: number;
 }
 
-export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, selectedExpiry, selectedStrike, selectedOptionType, futurePrice }: OrderPanelProps) {
+export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, selectedExpiry, selectedStrike, selectedOptionType, futurePrice, optionPrice }: OrderPanelProps) {
   const [side, setSide] = useState<OrderSide>('BUY');
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
   const [qty, setQty] = useState('1');
