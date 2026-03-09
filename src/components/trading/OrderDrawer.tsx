@@ -29,7 +29,7 @@ interface OrderDrawerProps {
 
 export function OrderDrawer({
   open, onOpenChange, stock, availableBalance, onPlaceOrder,
-  segment, defaultSide, selectedExpiry, selectedStrike, selectedOptionType, futurePrice
+  segment, defaultSide, selectedExpiry, selectedStrike, selectedOptionType, futurePrice, optionPrice
 }: OrderDrawerProps) {
   const [side, setSide] = useState<OrderSide>(defaultSide);
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
