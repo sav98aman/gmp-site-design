@@ -19,6 +19,7 @@ interface OrderPanelProps {
   selectedStrike?: number;
   selectedOptionType?: 'CE' | 'PE';
   futurePrice?: number;
+  optionPrice?: number;
 }
 
 export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, selectedExpiry, selectedStrike, selectedOptionType, futurePrice }: OrderPanelProps) {
