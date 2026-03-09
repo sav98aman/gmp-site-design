@@ -24,6 +24,7 @@ interface OrderDrawerProps {
   selectedStrike?: number;
   selectedOptionType?: 'CE' | 'PE';
   futurePrice?: number;
+  optionPrice?: number;
 }
 
 export function OrderDrawer({
