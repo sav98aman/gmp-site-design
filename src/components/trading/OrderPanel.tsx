@@ -54,10 +54,24 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
     });
   };
 
+  const needsSelection = (segment === 'OPT' && (!selectedStrike || !selectedOptionType))
+    || (segment === 'FUT' && !selectedExpiry);
+
   if (!stock) {
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4">
         Select a stock to trade
+      </div>
+    );
+  }
+
+  if (needsSelection) {
+    return (
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4 text-center">
+        <div>
+          <AlertCircle className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
+          {segment === 'OPT' ? 'Select a strike price from the Options Chain' : 'Select a futures contract'}
+        </div>
       </div>
     );
   }
