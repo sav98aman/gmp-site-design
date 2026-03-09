@@ -448,6 +448,7 @@ export default function PaperTrading() {
               selectedStrike={segment === 'OPT' ? selectedStrike : undefined}
               selectedOptionType={segment === 'OPT' ? selectedOptionType : undefined}
               futurePrice={segment === 'FUT' ? selectedFuture?.ltp : undefined}
+              optionPrice={segment === 'OPT' ? selectedOptionLTP : undefined}
             />
           </div>
 
