@@ -109,7 +109,9 @@ export default function PaperTrading() {
   // ── Order Execution ──
   const handlePlaceOrder = useCallback((orderData: Omit<Order, 'id' | 'timestamp' | 'status'>) => {
     if (!selectedStock) return;
-    const ltp = segment === 'FUT' && selectedFuture ? selectedFuture.ltp : selectedStock.livePrice;
+    const ltp = segment === 'FUT' && selectedFuture ? selectedFuture.ltp
+      : segment === 'OPT' && selectedOptionLTP ? selectedOptionLTP
+      : selectedStock.livePrice;
     const executedPrice = orderData.orderType === 'MARKET' ? ltp : orderData.price;
     const totalValue = orderData.qty * executedPrice;
     const marginRequired = segment === 'EQ' || segment === 'CNC' ? totalValue : totalValue * 0.12;
