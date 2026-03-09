@@ -53,7 +53,9 @@ export function OrderDrawer({
 
   if (!stock) return null;
 
-  const ltp = segment === 'FUT' ? (futurePrice ?? stock.livePrice) : stock.livePrice;
+  const ltp = segment === 'FUT' ? (futurePrice ?? stock.livePrice)
+    : segment === 'OPT' ? (optionPrice ?? stock.livePrice)
+    : stock.livePrice;
   const lotSize = getLotSize(stock.symbol);
   const effectiveQty = (segment === 'FUT' || segment === 'OPT') ? Number(qty) * lotSize : Number(qty);
   const executionPrice = orderType === 'MARKET' ? ltp : Number(price) || ltp;
