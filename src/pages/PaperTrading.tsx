@@ -62,6 +62,7 @@ export default function PaperTrading() {
 
   const [selectedStrike, setSelectedStrike] = useState<number | undefined>();
   const [selectedOptionType, setSelectedOptionType] = useState<'CE' | 'PE' | undefined>();
+  const [selectedOptionLTP, setSelectedOptionLTP] = useState<number | undefined>();
   const [selectedFuture, setSelectedFuture] = useState<FutureContract | undefined>();
 
   const optionsChain = selectedStock ? generateOptionsChain(selectedStock.livePrice, selectedStock.symbol) : [];
