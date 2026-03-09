@@ -30,7 +30,9 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
   const [triggerPrice, setTriggerPrice] = useState('');
   const [productType, setProductType] = useState<'MIS' | 'NRML' | 'CNC'>('MIS');
 
-  const ltp = segment === 'FUT' ? (futurePrice ?? stock?.livePrice ?? 0) : stock?.livePrice ?? 0;
+  const ltp = segment === 'FUT' ? (futurePrice ?? stock?.livePrice ?? 0)
+    : segment === 'OPT' ? (optionPrice ?? stock?.livePrice ?? 0)
+    : stock?.livePrice ?? 0;
   const lotSize = stock ? getLotSize(stock.symbol) : 1;
   const effectiveQty = (segment === 'FUT' || segment === 'OPT') ? Number(qty) * lotSize : Number(qty);
   const executionPrice = orderType === 'MARKET' ? ltp : Number(price) || ltp;
