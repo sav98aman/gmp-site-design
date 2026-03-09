@@ -93,6 +93,7 @@ export default function PaperTrading() {
     setSelectedStock(stock);
     setSelectedStrike(undefined);
     setSelectedOptionType(undefined);
+    setSelectedOptionLTP(undefined);
     setSelectedFuture(undefined);
   };
 
