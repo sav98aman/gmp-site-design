@@ -401,7 +401,7 @@ export default function PaperTrading() {
                       {selectedStrike && selectedOptionType && <Badge variant="outline" className="text-[10px]">{selectedStrike} {selectedOptionType}</Badge>}
                     </div>
                     <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice}
-                      onSelectOption={(s, t) => { setSelectedStrike(s); setSelectedOptionType(t); }}
+                      onSelectOption={(s, t, ltp) => { setSelectedStrike(s); setSelectedOptionType(t); setSelectedOptionLTP(ltp); }}
                       selectedStrike={selectedStrike} selectedType={selectedOptionType} />
                   </div>
                 )}
