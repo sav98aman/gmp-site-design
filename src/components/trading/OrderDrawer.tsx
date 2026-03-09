@@ -24,11 +24,12 @@ interface OrderDrawerProps {
   selectedStrike?: number;
   selectedOptionType?: 'CE' | 'PE';
   futurePrice?: number;
+  optionPrice?: number;
 }
 
 export function OrderDrawer({
   open, onOpenChange, stock, availableBalance, onPlaceOrder,
-  segment, defaultSide, selectedExpiry, selectedStrike, selectedOptionType, futurePrice
+  segment, defaultSide, selectedExpiry, selectedStrike, selectedOptionType, futurePrice, optionPrice
 }: OrderDrawerProps) {
   const [side, setSide] = useState<OrderSide>(defaultSide);
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
@@ -52,7 +53,9 @@ export function OrderDrawer({
 
   if (!stock) return null;
 
-  const ltp = segment === 'FUT' ? (futurePrice ?? stock.livePrice) : stock.livePrice;
+  const ltp = segment === 'FUT' ? (futurePrice ?? stock.livePrice)
+    : segment === 'OPT' ? (optionPrice ?? stock.livePrice)
+    : stock.livePrice;
   const lotSize = getLotSize(stock.symbol);
   const effectiveQty = (segment === 'FUT' || segment === 'OPT') ? Number(qty) * lotSize : Number(qty);
   const executionPrice = orderType === 'MARKET' ? ltp : Number(price) || ltp;

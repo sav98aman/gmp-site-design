@@ -62,6 +62,7 @@ export default function PaperTrading() {
 
   const [selectedStrike, setSelectedStrike] = useState<number | undefined>();
   const [selectedOptionType, setSelectedOptionType] = useState<'CE' | 'PE' | undefined>();
+  const [selectedOptionLTP, setSelectedOptionLTP] = useState<number | undefined>();
   const [selectedFuture, setSelectedFuture] = useState<FutureContract | undefined>();
 
   const optionsChain = selectedStock ? generateOptionsChain(selectedStock.livePrice, selectedStock.symbol) : [];
@@ -92,6 +93,7 @@ export default function PaperTrading() {
     setSelectedStock(stock);
     setSelectedStrike(undefined);
     setSelectedOptionType(undefined);
+    setSelectedOptionLTP(undefined);
     setSelectedFuture(undefined);
   };
 
@@ -107,7 +109,9 @@ export default function PaperTrading() {
   // ── Order Execution ──
   const handlePlaceOrder = useCallback((orderData: Omit<Order, 'id' | 'timestamp' | 'status'>) => {
     if (!selectedStock) return;
-    const ltp = segment === 'FUT' && selectedFuture ? selectedFuture.ltp : selectedStock.livePrice;
+    const ltp = segment === 'FUT' && selectedFuture ? selectedFuture.ltp
+      : segment === 'OPT' && selectedOptionLTP ? selectedOptionLTP
+      : selectedStock.livePrice;
     const executedPrice = orderData.orderType === 'MARKET' ? ltp : orderData.price;
     const totalValue = orderData.qty * executedPrice;
     const marginRequired = segment === 'EQ' || segment === 'CNC' ? totalValue : totalValue * 0.12;
@@ -178,7 +182,7 @@ export default function PaperTrading() {
     } else {
       toast.info(`${orderData.orderType} order placed`);
     }
-  }, [selectedStock, segment, selectedFuture, funds.availableBalance]);
+  }, [selectedStock, segment, selectedFuture, selectedOptionLTP, funds.availableBalance]);
 
   const handleSquareOff = (position: Position) => {
     const stocks = (position.segment === 'FUT' || position.segment === 'OPT') ? getFnOStocks() : getEquityStocks();
@@ -208,6 +212,7 @@ export default function PaperTrading() {
     selectedStrike: segment === 'OPT' ? selectedStrike : undefined,
     selectedOptionType: segment === 'OPT' ? selectedOptionType : undefined,
     futurePrice: segment === 'FUT' ? selectedFuture?.ltp : undefined,
+    optionPrice: segment === 'OPT' ? selectedOptionLTP : undefined,
   };
 
   // ──────────────────────────────
@@ -263,7 +268,7 @@ export default function PaperTrading() {
             {selectedStock && segment === 'OPT' && (
               <div className="border border-border rounded overflow-hidden">
                 <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice}
-                  onSelectOption={(s, t) => { setSelectedStrike(s); setSelectedOptionType(t); }}
+                  onSelectOption={(s, t, ltp) => { setSelectedStrike(s); setSelectedOptionType(t); setSelectedOptionLTP(ltp); }}
                   selectedStrike={selectedStrike} selectedType={selectedOptionType} />
               </div>
             )}
@@ -396,7 +401,7 @@ export default function PaperTrading() {
                       {selectedStrike && selectedOptionType && <Badge variant="outline" className="text-[10px]">{selectedStrike} {selectedOptionType}</Badge>}
                     </div>
                     <OptionsChain data={optionsChain} spotPrice={selectedStock.livePrice}
-                      onSelectOption={(s, t) => { setSelectedStrike(s); setSelectedOptionType(t); }}
+                      onSelectOption={(s, t, ltp) => { setSelectedStrike(s); setSelectedOptionType(t); setSelectedOptionLTP(ltp); }}
                       selectedStrike={selectedStrike} selectedType={selectedOptionType} />
                   </div>
                 )}
@@ -443,6 +448,7 @@ export default function PaperTrading() {
               selectedStrike={segment === 'OPT' ? selectedStrike : undefined}
               selectedOptionType={segment === 'OPT' ? selectedOptionType : undefined}
               futurePrice={segment === 'FUT' ? selectedFuture?.ltp : undefined}
+              optionPrice={segment === 'OPT' ? selectedOptionLTP : undefined}
             />
           </div>
 

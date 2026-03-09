@@ -19,9 +19,10 @@ interface OrderPanelProps {
   selectedStrike?: number;
   selectedOptionType?: 'CE' | 'PE';
   futurePrice?: number;
+  optionPrice?: number;
 }
 
-export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, selectedExpiry, selectedStrike, selectedOptionType, futurePrice }: OrderPanelProps) {
+export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, selectedExpiry, selectedStrike, selectedOptionType, futurePrice, optionPrice }: OrderPanelProps) {
   const [side, setSide] = useState<OrderSide>('BUY');
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
   const [qty, setQty] = useState('1');
@@ -29,7 +30,9 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
   const [triggerPrice, setTriggerPrice] = useState('');
   const [productType, setProductType] = useState<'MIS' | 'NRML' | 'CNC'>('MIS');
 
-  const ltp = segment === 'FUT' ? (futurePrice ?? stock?.livePrice ?? 0) : stock?.livePrice ?? 0;
+  const ltp = segment === 'FUT' ? (futurePrice ?? stock?.livePrice ?? 0)
+    : segment === 'OPT' ? (optionPrice ?? stock?.livePrice ?? 0)
+    : stock?.livePrice ?? 0;
   const lotSize = stock ? getLotSize(stock.symbol) : 1;
   const effectiveQty = (segment === 'FUT' || segment === 'OPT') ? Number(qty) * lotSize : Number(qty);
   const executionPrice = orderType === 'MARKET' ? ltp : Number(price) || ltp;
@@ -51,10 +54,24 @@ export function OrderPanel({ stock, availableBalance, onPlaceOrder, segment, sel
     });
   };
 
+  const needsSelection = (segment === 'OPT' && (!selectedStrike || !selectedOptionType))
+    || (segment === 'FUT' && !selectedExpiry);
+
   if (!stock) {
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4">
         Select a stock to trade
+      </div>
+    );
+  }
+
+  if (needsSelection) {
+    return (
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4 text-center">
+        <div>
+          <AlertCircle className="h-5 w-5 mx-auto mb-2 text-muted-foreground/50" />
+          {segment === 'OPT' ? 'Select a strike price from the Options Chain' : 'Select a futures contract'}
+        </div>
       </div>
     );
   }
