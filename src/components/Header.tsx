@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu, TrendingUp } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Menu, TrendingUp, User, LogOut, Settings, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
 
 const navLinks = [
   { path: "/", label: "Dashboard" },
@@ -18,7 +20,9 @@ const navLinks = [
 
 export function Header() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { user, profile, role, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
@@ -61,6 +65,47 @@ export function Header() {
           </div>
 
           <ThemeToggle />
+
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 bg-primary/10 text-primary font-bold text-sm">
+                  {profile?.full_name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{profile?.full_name || "User"}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/profile")}>
+                  <User className="h-4 w-4 mr-2" /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/pricing")}>
+                  <Crown className="h-4 w-4 mr-2" /> Plans
+                </DropdownMenuItem>
+                {role === "admin" && (
+                  <DropdownMenuItem onClick={() => navigate("/admin")}>
+                    <Settings className="h-4 w-4 mr-2" /> Admin Panel
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { signOut(); navigate("/"); }}>
+                  <LogOut className="h-4 w-4 mr-2" /> Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/auth">Login</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link to="/auth">Sign Up</Link>
+              </Button>
+            </div>
+          )}
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild className="md:hidden">
