@@ -29,9 +29,10 @@
     --destructive: 18 87% 40%;         /* #c2410c orange */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 120 6% 11%;              /* ink-tinted border, used at low alpha */
-    --input: 120 6% 11%;
+    --border: 120 6% 84%;              /* subtle ink-tinted hairline */
+    --input: 120 6% 80%;
     --ring: 156 83% 30%;
+
 
     --radius: 0.125rem;                /* sharp editorial corners */
 
