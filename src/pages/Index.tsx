@@ -171,28 +171,74 @@ const Index = () => {
       <div className="flex" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
         {/* Left sticky rail */}
         <aside
-          className="hidden lg:flex w-[280px] sticky top-[56px] self-start h-[calc(100vh-56px)] border-r p-6 flex-col gap-10 overflow-y-auto"
+          className="hidden lg:flex w-[260px] sticky top-[56px] self-start h-[calc(100vh-56px)] border-r flex-col overflow-y-auto"
           style={{ borderColor: `${INK}1A`, background: PAPER }}
         >
-          {/* Status */}
-          <div>
-            <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold mb-4" style={{ color: `${INK}66` }}>
+          {/* Brand strip */}
+          <div className="px-5 pt-6 pb-4 border-b" style={{ borderColor: `${INK}1A` }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[9px] font-bold uppercase tracking-[0.25em]" style={{ color: `${INK}66` }}>
+                Filters
+              </span>
+              {(statusFilter !== "all" || boardFilter !== "all" || minGmp > 0 || search) && (
+                <button
+                  onClick={() => { setStatusFilter("all"); setBoardFilter("all"); setMinGmp(0); setSearch(""); }}
+                  className="text-[9px] font-bold uppercase tracking-widest underline-offset-2 hover:underline"
+                  style={{ color: ORANGE }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            {/* Search */}
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: `${INK}66` }}>
+                <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search companies…"
+                className="w-full bg-white border pl-8 pr-3 py-2 text-xs outline-none transition-colors focus:border-[color:#1a1d1a]"
+                style={{ borderColor: `${INK}1A` }}
+              />
+            </div>
+          </div>
+
+          {/* Status list */}
+          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
+            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
               Status
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-0.5 -mx-2">
               {STATUS_OPTIONS.map(opt => {
                 const active = statusFilter === opt.key;
+                const dotColor =
+                  opt.key === "live" ? GREEN :
+                  opt.key === "upcoming" ? BLUE :
+                  opt.key === "listed" ? ORANGE :
+                  opt.key === "closed" ? `${INK}66` : INK;
                 return (
                   <button
                     key={opt.key}
                     onClick={() => setStatusFilter(opt.key)}
-                    className="flex items-center gap-3 cursor-pointer w-full text-left"
+                    className={cn(
+                      "flex items-center justify-between w-full px-2 py-1.5 text-left transition-colors group",
+                      active ? "bg-white" : "hover:bg-white/60"
+                    )}
+                    style={active ? { boxShadow: `inset 2px 0 0 ${INK}` } : undefined}
                   >
-                    <StatusDot active={active} />
+                    <span className="flex items-center gap-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+                      <span className={cn("text-[11px] font-bold uppercase tracking-wider", !active && "opacity-60")}>
+                        {opt.label}
+                      </span>
+                    </span>
                     <span
-                      className={cn("text-xs font-bold uppercase tracking-wider", active ? "" : "opacity-60")}
+                      className={cn("text-[10px] font-mono tabular-nums px-1.5 py-0.5 border", active ? "" : "opacity-50")}
+                      style={{ borderColor: `${INK}1A`, background: active ? INK : "transparent", color: active ? PAPER : INK }}
                     >
-                      {opt.label} ({counts[opt.key]})
+                      {counts[opt.key]}
                     </span>
                   </button>
                 );
@@ -201,8 +247,8 @@ const Index = () => {
           </div>
 
           {/* Segment */}
-          <div>
-            <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold mb-4" style={{ color: `${INK}66` }}>
+          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
+            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
               Segment
             </h2>
             <div className="grid grid-cols-3 bg-white border" style={{ borderColor: `${INK}1A` }}>
@@ -210,10 +256,11 @@ const Index = () => {
                 <button
                   key={seg}
                   onClick={() => setBoardFilter(seg)}
-                  className="py-2 text-[10px] font-bold uppercase tracking-widest transition-colors"
+                  className="py-2 text-[10px] font-bold uppercase tracking-widest transition-colors border-r last:border-r-0"
                   style={{
                     background: boardFilter === seg ? INK : "transparent",
                     color: boardFilter === seg ? PAPER : INK,
+                    borderColor: `${INK}1A`,
                   }}
                 >
                   {seg === "all" ? "All" : seg}
@@ -223,49 +270,68 @@ const Index = () => {
           </div>
 
           {/* GMP slider */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-end">
-              <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold" style={{ color: `${INK}66` }}>
-                Min GMP %
+          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
+            <div className="flex justify-between items-baseline mb-3">
+              <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: `${INK}66` }}>
+                Min GMP
               </h2>
-              <span className="text-[10px] font-bold font-mono">{minGmp}%+</span>
+              <span
+                className="text-[11px] font-mono font-bold px-2 py-0.5 border"
+                style={{ borderColor: `${INK}1A`, color: minGmp > 0 ? GREEN : INK, background: "white" }}
+              >
+                {minGmp}%+
+              </span>
             </div>
             <input
               type="range"
               min={0}
               max={100}
+              step={5}
               value={minGmp}
               onChange={e => setMinGmp(Number(e.target.value))}
-              className="w-full h-1 appearance-none cursor-pointer rounded-full"
+              className="w-full h-1 appearance-none cursor-pointer"
               style={{ accentColor: GREEN, background: `${INK}1A` }}
             />
-          </div>
-
-          {/* Search */}
-          <div className="space-y-2">
-            <h2 className="text-[10px] uppercase tracking-[0.2em] font-bold" style={{ color: `${INK}66` }}>
-              Search
-            </h2>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Company name…"
-              className="w-full bg-white border px-3 py-2 text-xs outline-none focus:border-[color:var(--ink)]"
-              style={{ borderColor: `${INK}1A` }}
-            />
-          </div>
-
-          {/* Market open */}
-          <div className="mt-auto pb-4 border-t pt-6" style={{ borderColor: `${INK}1A` }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: GREEN }} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Market Open</span>
+            <div className="flex justify-between mt-2 text-[9px] font-mono" style={{ color: `${INK}66` }}>
+              <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
             </div>
-            <p className="text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>
-              Tracking {mockIPOs.length} active &amp; historical issues across Mainboard and SME clusters.
-            </p>
+          </div>
+
+          {/* Quick stats */}
+          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
+            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
+              At a glance
+            </h2>
+            <dl className="grid grid-cols-2 gap-px bg-[#1a1d1a14]">
+              {[
+                { label: "Total", value: mockIPOs.length },
+                { label: "Buy", value: mockIPOs.filter(i => i.aiVerdict === "BUY").length, color: GREEN },
+                { label: "Avg GMP", value: `${Math.round(mockIPOs.reduce((s, i) => s + getGMPPercentage(i), 0) / mockIPOs.length)}%` },
+                { label: "SME", value: mockIPOs.filter(i => i.boardType === "SME").length, color: BLUE },
+              ].map(s => (
+                <div key={s.label} className="bg-white p-2.5">
+                  <dt className="text-[8px] font-bold uppercase tracking-widest" style={{ color: `${INK}66` }}>{s.label}</dt>
+                  <dd className="text-base font-mono font-bold mt-0.5" style={{ color: s.color || INK }}>{s.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          {/* Market open footer */}
+          <div className="mt-auto px-5 py-4 border-t" style={{ borderColor: `${INK}1A`, background: "white" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inset-0 rounded-full animate-ping" style={{ background: GREEN, opacity: 0.6 }} />
+                  <span className="relative w-2 h-2 rounded-full" style={{ background: GREEN }} />
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Market Open</span>
+              </div>
+              <span className="text-[9px] font-mono" style={{ color: `${INK}66` }}>NSE · BSE</span>
+            </div>
           </div>
         </aside>
+
 
         {/* Right feed */}
         <main className="flex-1 min-w-0 px-6 py-10 md:px-12 md:py-14">
