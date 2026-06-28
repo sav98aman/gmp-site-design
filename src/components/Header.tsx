@@ -25,44 +25,51 @@ export function Header() {
   const { user, profile, role, signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
-      <div className="container flex h-16 items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/90 backdrop-blur-md">
+      <div className="container flex h-14 items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-md">
-              <TrendingUp className="h-5 w-5 text-primary-foreground" />
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="flex h-8 w-8 items-center justify-center bg-foreground text-background rounded-sm">
+              <TrendingUp className="h-4 w-4" />
             </div>
-            <span className="text-xl font-bold tracking-tight">
-              Live<span className="text-primary">GMP</span>
+            <span className="text-base font-bold tracking-tight uppercase" style={{ letterSpacing: "0.05em" }}>
+              Live<span className="text-[hsl(var(--accent))]">·GMP</span>
             </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={cn(
-                  "px-3.5 py-2 text-sm font-medium rounded-lg transition-colors",
-                  location.pathname === link.path
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const active = location.pathname === link.path;
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={cn(
+                    "relative px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors",
+                    active
+                      ? "text-foreground"
+                      : "text-foreground/55 hover:text-foreground"
+                  )}
+                >
+                  {link.label}
+                  {active && (
+                    <span className="absolute left-3 right-3 -bottom-[1px] h-[2px] bg-foreground" />
+                  )}
+                </Link>
+              );
+            })}
           </nav>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+          <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-foreground/60 border border-foreground/15 px-2.5 py-1">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[hsl(var(--accent))] opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[hsl(var(--accent))]" />
             </span>
-            Live Updates
+            Live
           </div>
+
 
           <ThemeToggle />
 
