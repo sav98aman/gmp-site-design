@@ -89,9 +89,10 @@
     --destructive: 18 80% 55%;
     --destructive-foreground: 50 20% 94%;
 
-    --border: 50 20% 94%;
-    --input: 50 20% 94%;
+    --border: 120 6% 18%;
+    --input: 120 6% 20%;
     --ring: 156 70% 45%;
+
 
     --sidebar-background: 120 6% 8%;
     --sidebar-foreground: 50 20% 94%;
