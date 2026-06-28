@@ -168,217 +168,131 @@ const Index = () => {
     <div className="min-h-screen" style={{ background: PAPER, color: INK }}>
       <Header />
 
-      <div className="flex" style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
-        {/* Left sticky rail */}
-        <aside
-          className="hidden lg:flex w-[260px] sticky top-[56px] self-start h-[calc(100vh-56px)] border-r flex-col overflow-y-auto"
-          style={{ borderColor: `${INK}1A`, background: PAPER }}
-        >
-          {/* Brand strip */}
-          <div className="px-5 pt-6 pb-4 border-b" style={{ borderColor: `${INK}1A` }}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-bold uppercase tracking-[0.25em]" style={{ color: `${INK}66` }}>
-                Filters
-              </span>
-              {(statusFilter !== "all" || boardFilter !== "all" || minGmp > 0 || search) && (
-                <button
-                  onClick={() => { setStatusFilter("all"); setBoardFilter("all"); setMinGmp(0); setSearch(""); }}
-                  className="text-[9px] font-bold uppercase tracking-widest underline-offset-2 hover:underline"
-                  style={{ color: ORANGE }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-            {/* Search */}
-            <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: `${INK}66` }}>
-                <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-              </svg>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search companies…"
-                className="w-full bg-white border pl-8 pr-3 py-2 text-xs outline-none transition-colors focus:border-[color:#1a1d1a]"
-                style={{ borderColor: `${INK}1A` }}
-              />
-            </div>
-          </div>
-
-          {/* Status list */}
-          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
-            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
-              Status
-            </h2>
-            <div className="space-y-0.5 -mx-2">
-              {STATUS_OPTIONS.map(opt => {
-                const active = statusFilter === opt.key;
-                const dotColor =
-                  opt.key === "live" ? GREEN :
-                  opt.key === "upcoming" ? BLUE :
-                  opt.key === "listed" ? ORANGE :
-                  opt.key === "closed" ? `${INK}66` : INK;
-                return (
-                  <button
-                    key={opt.key}
-                    onClick={() => setStatusFilter(opt.key)}
-                    className={cn(
-                      "flex items-center justify-between w-full px-2 py-1.5 text-left transition-colors group",
-                      active ? "bg-white" : "hover:bg-white/60"
-                    )}
-                    style={active ? { boxShadow: `inset 2px 0 0 ${INK}` } : undefined}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
-                      <span className={cn("text-[11px] font-bold uppercase tracking-wider", !active && "opacity-60")}>
-                        {opt.label}
-                      </span>
-                    </span>
-                    <span
-                      className={cn("text-[10px] font-mono tabular-nums px-1.5 py-0.5 border", active ? "" : "opacity-50")}
-                      style={{ borderColor: `${INK}1A`, background: active ? INK : "transparent", color: active ? PAPER : INK }}
-                    >
-                      {counts[opt.key]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Segment */}
-          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
-            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
-              Segment
-            </h2>
-            <div className="grid grid-cols-3 bg-white border" style={{ borderColor: `${INK}1A` }}>
-              {(["all", "Mainboard", "SME"] as const).map(seg => (
-                <button
-                  key={seg}
-                  onClick={() => setBoardFilter(seg)}
-                  className="py-2 text-[10px] font-bold uppercase tracking-widest transition-colors border-r last:border-r-0"
-                  style={{
-                    background: boardFilter === seg ? INK : "transparent",
-                    color: boardFilter === seg ? PAPER : INK,
-                    borderColor: `${INK}1A`,
-                  }}
-                >
-                  {seg === "all" ? "All" : seg}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* GMP slider */}
-          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
-            <div className="flex justify-between items-baseline mb-3">
-              <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold" style={{ color: `${INK}66` }}>
-                Min GMP
-              </h2>
-              <span
-                className="text-[11px] font-mono font-bold px-2 py-0.5 border"
-                style={{ borderColor: `${INK}1A`, color: minGmp > 0 ? GREEN : INK, background: "white" }}
-              >
-                {minGmp}%+
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={minGmp}
-              onChange={e => setMinGmp(Number(e.target.value))}
-              className="w-full h-1 appearance-none cursor-pointer"
-              style={{ accentColor: GREEN, background: `${INK}1A` }}
-            />
-            <div className="flex justify-between mt-2 text-[9px] font-mono" style={{ color: `${INK}66` }}>
-              <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
-            </div>
-          </div>
-
-          {/* Quick stats */}
-          <div className="px-5 py-5 border-b" style={{ borderColor: `${INK}1A` }}>
-            <h2 className="text-[9px] uppercase tracking-[0.25em] font-bold mb-3" style={{ color: `${INK}66` }}>
-              At a glance
-            </h2>
-            <dl className="grid grid-cols-2 gap-px bg-[#1a1d1a14]">
-              {[
-                { label: "Total", value: mockIPOs.length },
-                { label: "Buy", value: mockIPOs.filter(i => i.aiVerdict === "BUY").length, color: GREEN },
-                { label: "Avg GMP", value: `${Math.round(mockIPOs.reduce((s, i) => s + getGMPPercentage(i), 0) / mockIPOs.length)}%` },
-                { label: "SME", value: mockIPOs.filter(i => i.boardType === "SME").length, color: BLUE },
-              ].map(s => (
-                <div key={s.label} className="bg-white p-2.5">
-                  <dt className="text-[8px] font-bold uppercase tracking-widest" style={{ color: `${INK}66` }}>{s.label}</dt>
-                  <dd className="text-base font-mono font-bold mt-0.5" style={{ color: s.color || INK }}>{s.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          {/* Market open footer */}
-          <div className="mt-auto px-5 py-4 border-t" style={{ borderColor: `${INK}1A`, background: "white" }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inset-0 rounded-full animate-ping" style={{ background: GREEN, opacity: 0.6 }} />
-                  <span className="relative w-2 h-2 rounded-full" style={{ background: GREEN }} />
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest">Market Open</span>
-              </div>
-              <span className="text-[9px] font-mono" style={{ color: `${INK}66` }}>NSE · BSE</span>
-            </div>
-          </div>
-        </aside>
-
-
-        {/* Right feed */}
-        <main className="flex-1 min-w-0 px-6 py-10 md:px-12 md:py-14">
-          <div className="max-w-4xl mx-auto">
-            {/* Mobile filter pills */}
-            <div className="lg:hidden flex gap-2 overflow-x-auto pb-4 mb-6 -mx-2 px-2">
-              {STATUS_OPTIONS.map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setStatusFilter(opt.key)}
-                  className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border whitespace-nowrap"
-                  style={{
-                    borderColor: statusFilter === opt.key ? INK : `${INK}1A`,
-                    background: statusFilter === opt.key ? INK : "transparent",
-                    color: statusFilter === opt.key ? PAPER : INK,
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+      <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}>
+        <main className="px-6 py-10 md:px-12 md:py-14">
+          <div className="max-w-6xl mx-auto">
 
             {/* Header */}
-            <header className="mb-12 md:mb-16">
-              <div className="flex flex-wrap justify-between items-baseline gap-4 mb-4">
-                <h1 className="text-5xl md:text-6xl font-bold tracking-tight">IPO Explorer</h1>
-                <div className="flex gap-4">
-                  {(["gmp", "subscription", "closing"] as SortKey[]).map(k => (
+            <header className="mb-8 md:mb-10">
+              <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-3">IPO Explorer</h1>
+              <p className="text-base md:text-lg font-medium max-w-2xl" style={{ color: `${INK}B3` }}>
+                Real-time intelligence on Mainboard and SME listings. Tracking {mockIPOs.length} active and historical offerings with deep analytics.
+              </p>
+            </header>
+
+            {/* Filter Bar */}
+            <div
+              className="bg-white border mb-10 md:mb-12"
+              style={{ borderColor: `${INK}1A` }}
+            >
+              {/* Row 1: Status + counts */}
+              <div className="flex items-stretch overflow-x-auto border-b" style={{ borderColor: `${INK}1A` }}>
+                {STATUS_OPTIONS.map(opt => {
+                  const active = statusFilter === opt.key;
+                  const dotColor =
+                    opt.key === "live" ? GREEN :
+                    opt.key === "upcoming" ? BLUE :
+                    opt.key === "listed" ? ORANGE :
+                    opt.key === "closed" ? `${INK}66` : INK;
+                  return (
                     <button
-                      key={k}
-                      onClick={() => setSort(k)}
+                      key={opt.key}
+                      onClick={() => setStatusFilter(opt.key)}
                       className={cn(
-                        "text-[10px] font-bold uppercase tracking-wider transition-opacity",
-                        sort === k ? "border-b" : "opacity-40 hover:opacity-100"
+                        "flex items-center gap-2 px-4 md:px-5 py-3 text-[10px] font-bold uppercase tracking-widest whitespace-nowrap border-r transition-colors relative",
+                        active ? "" : "opacity-50 hover:opacity-100"
                       )}
-                      style={{ borderColor: INK }}
+                      style={{
+                        borderColor: `${INK}1A`,
+                        background: active ? PAPER : "transparent",
+                      }}
                     >
-                      Sort: {k === "gmp" ? "GMP %" : k === "subscription" ? "Subscription" : "Closing"}
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+                      <span>{opt.label}</span>
+                      <span className="font-mono opacity-60 text-[10px]">{counts[opt.key]}</span>
+                      {active && <span className="absolute left-0 right-0 -bottom-px h-[2px]" style={{ background: INK }} />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Row 2: Search + Segment + GMP + Sort */}
+              <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-0 p-3 md:p-0">
+                {/* Search */}
+                <div className="relative flex-1 md:border-r md:px-4 md:py-3" style={{ borderColor: `${INK}1A` }}>
+                  <svg className="absolute left-2.5 md:left-6 top-1/2 -translate-y-1/2 w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: `${INK}66` }}>
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search companies…"
+                    className="w-full bg-transparent pl-8 md:pl-7 pr-3 py-2 text-xs outline-none placeholder:opacity-50"
+                  />
+                </div>
+
+                {/* Segment */}
+                <div className="flex md:border-r md:px-4" style={{ borderColor: `${INK}1A` }}>
+                  {(["all", "Mainboard", "SME"] as const).map(seg => (
+                    <button
+                      key={seg}
+                      onClick={() => setBoardFilter(seg)}
+                      className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors"
+                      style={{
+                        background: boardFilter === seg ? INK : "transparent",
+                        color: boardFilter === seg ? PAPER : INK,
+                      }}
+                    >
+                      {seg === "all" ? "All" : seg}
                     </button>
                   ))}
                 </div>
+
+                {/* GMP min */}
+                <div className="flex items-center gap-3 md:border-r md:px-4 md:py-3" style={{ borderColor: `${INK}1A` }}>
+                  <span className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: `${INK}66` }}>
+                    Min GMP
+                  </span>
+                  <input
+                    type="range"
+                    min={0} max={100} step={5}
+                    value={minGmp}
+                    onChange={e => setMinGmp(Number(e.target.value))}
+                    className="w-24 h-1 appearance-none cursor-pointer"
+                    style={{ accentColor: GREEN, background: `${INK}1A` }}
+                  />
+                  <span
+                    className="text-[11px] font-mono font-bold tabular-nums w-12 text-right"
+                    style={{ color: minGmp > 0 ? GREEN : INK }}
+                  >
+                    {minGmp}%+
+                  </span>
+                </div>
+
+                {/* Sort */}
+                <div className="flex items-center gap-3 md:px-4 md:py-3 md:ml-auto">
+                  <span className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: `${INK}66` }}>
+                    Sort
+                  </span>
+                  <div className="flex gap-1">
+                    {(["gmp", "subscription", "closing"] as SortKey[]).map(k => (
+                      <button
+                        key={k}
+                        onClick={() => setSort(k)}
+                        className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                        style={{
+                          background: sort === k ? INK : "transparent",
+                          color: sort === k ? PAPER : `${INK}99`,
+                        }}
+                      >
+                        {k === "gmp" ? "GMP" : k === "subscription" ? "Subs" : "Close"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <p className="text-lg font-medium max-w-xl" style={{ color: `${INK}B3` }}>
-                Real-time intelligence on Mainboard and SME listings. Tracking {mockIPOs.length} active and historical
-                offerings with deep analytics.
-              </p>
-            </header>
+            </div>
+
 
             {/* Hero feature */}
             {hero && (
